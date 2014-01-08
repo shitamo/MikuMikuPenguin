@@ -1,0 +1,2 @@
+docdir = $(datadir)/@PACKAGE@/doc
+doc_DATA = README_EN.html README_JP.html

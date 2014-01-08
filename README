@@ -1,0 +1,79 @@
+WARNING: THIS FILE IS ENCODED IN UTF-8, NOT SJIS!!!
+（注意：このファイルはSJISではなくUTF-8でエンコードされています！！！）
+
+LibMikuMikuPenguin(libmmp) v0.1 リードミ（日本語）
+
+(English translation is available below)
+どうも初めまして。ベンごとsn0w75です。
+
+自分の好きなOSでミクミクしたくて、それを出来る為のライブラリやプログラムを作ってみました。
+まだバグだらけですし、APIが確定しているわけでもないのでMMPをライブラリとして使うのはまだまだ早いかと思います。
+ですが、これを起点として、Windows意外のOSでのMMDの開発が段々進めていったら～と思ってます。
+
+最新のコードは以下のリンクで手に入れます：
+https://github.com/sn0w75/MikuMikuPenguin/
+
+中身はこんな感じです：
+COPYING　-　このコードのライセンス
+doc　-　ドキュメンテーションを入れる為のフォルダですが、現時点では得に何も入ってません。
+include -　LibMikuMikuPenguinのヘッダ（.h）ファイルがここに入ってます。
+INSTALL　-　このコードのインストール仕方（英語のみ）
+libmmp　-　LibMikuMikuPenguinのソース（.cpp）ファイルがここに入ってます。
+shaders　-　PMXViewerのシェーダーがここに入ってます。
+src　-　PMXViewerのソースコード（.cpp、.h）がここに入ってます。
+data　-　必要なテクスチャ等が入ってます。
+
+LibMikuMikuPenguinにはlibglfw, libBulletぐらいが必要だった気がします。
+PMXViewerにはlibmmp、libSOILが必要です。VMDと一緒に音楽を再生したい場合は、SDL2、SDL2_mixerも必要です。（なくてもコンパイル出来ます）
+
+このソースコードはautotoolsを利用していますので、コンパイルやインストールは簡単です：
+コンパイルするにはターミナルで：
+./configure
+make
+をすれば大丈夫です。
+またシステムにインストールしたい場合は：
+sudo make install
+みたいな感じで大丈夫です。
+
+他に質問がありました、気軽にメッセージ飛ばしてください。喜んで手伝ってあげます：
+Twitter- http://twitter.com/sn0w75
+E-mail- ibenrunnin@gmail.com
+
+それではまた。
+
+LibMikuMikuPenguin(libmmp) v0.1 Readme (English)
+Hello.
+
+I wanted to MikuMiku on my favorite operating system, so I wrote a program to do just that.
+It's still very buggy, and the API isn't particularly fixed in any manner so it's still too early to effectively use MMP as a library.
+However, I hope that this becomes a starting point for the development of MMD on operating systems other than Windows (although you actually can use this library in Windows).
+
+You should be able to get the latest version of the source code here:
+https://github.com/sn0w75/MikuMikuPenguin/
+
+The contents are listed below:
+COPYING - This license for MikuMikuPenguin is included in here.
+doc - This is a folder for putting various documentation into, but there's nothing in here in particular at this point in time.
+include - LibMikuMikuPenguin's header (.h) files are in this folder.
+INSTALL - Details on the installation of LibMikuMikuPenguin are available in this file (English only)
+libmmp - LibMikuMikuPenguin's source (.cpp) files are in this folder.
+shaders - PMXViewer's shaders are in this folder.
+src - PMXViewer's source code (.cpp, .h) are in this folder.
+data - Required textures and other data files are in this folder.
+
+For LibMikuMikuPenguin, I think you at least need libglfw and libBullet.
+For PMXViewer, libmmp and libSOIL are needed. If you want to play music along with the VMD motion, you'll need SDL2 and SDL2_mixer. (You can compile the code without music playback support)
+
+This source code uses autotools, so compiling the code is very simple:
+To compile, run the following commands in a terminal:
+./configure
+make
+To install libmmp and PMXViewer on your system, run:
+sudo make install
+(There may be an alternative to 'sudo' you need to use depending on your distro to run a process with admin privileges.)
+
+If you have any other questions, please toss me a message. I'll gladly help you out.
+Twitter- http://twitter.com/sn0w75
+E-mail- ibenrunnin@gmail.com
+
+
