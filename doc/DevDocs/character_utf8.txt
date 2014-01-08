@@ -1,7 +1,0 @@
-#include "StdAfx.h"
-#include "VmdMotionController.h"
-#include "Bezie.h"
-
-VmdMotionController::VmdMotionController(LPCTSTR filename, vector<Bone>* b,
-vector<MmdStruct::PmdIkData>* p) : bones(b), pmdIkData(p), time() {
-	const int frame_rate = 60;			// 本プログラムのフレームレー
