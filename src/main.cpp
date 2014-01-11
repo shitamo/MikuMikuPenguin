@@ -99,7 +99,7 @@ int main(int argc, char** argv)
 	}
 	
 	
-	Viewer viewer(model_file,motion_file);
+	Viewer viewer(model_file,motion_file,music_file);
 	
 	viewer.run();
 	

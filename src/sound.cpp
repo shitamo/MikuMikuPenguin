@@ -9,6 +9,10 @@ using namespace std;
 
 void initSound(string filename)
 {
+	if(filename=="") return;
+	
+	cout<<"initializing sound...";
+	
 	SDL_Init(SDL_INIT_AUDIO);
 	
 	Mix_Music *music=NULL;
@@ -31,11 +35,13 @@ void initSound(string filename)
 	//string filename="data/motion/Watashi no Jikan/jikan.ogg";
 	music = Mix_LoadMUS(filename.c_str());
 	
-	if( music == NULL && filename!="")
+	if( music == NULL)
 	{
 		cerr<<"ERROR: playMusic failed to load music"<<endl;
 		cerr<<SDL_GetError()<<endl;
 	}
+	
+	cout<<"done"<<endl;
 
 	Mix_PlayMusic(music, 0);
 }

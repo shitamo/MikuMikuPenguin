@@ -102,14 +102,14 @@ Viewer::Viewer(string modelPath, string motionPath,string musicPath)
 	}
 	//GLuint btDebugShaderProgram=loadShaders(DATA_PATH"/shaders/bulletDebug.vert",DATA_PATH"/shaders/bulletDebug.frag");
 	
+	initSound(musicPath);
+	
 	bulletPhysics = new BulletPhysics(btDebugShaderProgram);
 	glUseProgram(shaderProgram); //restore GL shader program to Viewer's shader program after initializing BulletPhysic's debugDrawer
 	mmdPhysics = new MMDPhysics(*pmxInfo,motionController,bulletPhysics);
 	
 	motionController->updateVertexMorphs();
 	motionController->updateBoneAnimation();
-	
-	initSound(musicPath);	
 	
 	//Initialize timer variables
 	startTime = glfwGetTime();
@@ -130,13 +130,11 @@ void Viewer::handleLogic()
 	{
 		motionController->advanceTime();
 		
-		glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
-		motionController->updateVertexMorphs();
-		motionController->updateBoneAnimation();
-		
 		//Debug- hold model in bind pose
 		//holdModelInBindPose();
 		
+		motionController->updateVertexMorphs();
+		motionController->updateBoneAnimation();
 		mmdPhysics->updateBones(doPhysics);
 		
 		glUseProgram(bulletPhysics->debugDrawer->shaderProgram);
@@ -174,7 +172,10 @@ void Viewer::render()
 		bulletPhysics->setDebugMode(btIDebugDraw::DBG_DrawConstraintLimits);
 		bulletPhysics->DebugDrawWorld();
 	}
-	glUseProgram(shaderProgram); //Restore shader program to Viewer's shader program after drawing Bullet debug
+	glUseProgram(shaderProgram); //Restore shader program and buffer's to Viewer's after drawing Bullet debug
+	glBindVertexArray(VAOs[Vertices]);
+	glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[VertexIndexBuffer]);
 	
 	//drawIKMarkers();
 
@@ -221,7 +222,7 @@ void Viewer::drawModel(bool drawEdges)
 	//Bind VAO and related Buffers
 	glBindVertexArray(VAOs[Vertices]);
 	glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[VertexIndexBuffer]);	
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[VertexIndexBuffer]);
 	
 	if(drawEdges)
 	{
