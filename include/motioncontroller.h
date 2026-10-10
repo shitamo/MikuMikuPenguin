@@ -10,6 +10,10 @@
 
 extern glm::quat IKQuat;
 
+//Texture unit used for the bone matrix buffer texture (units 0-2 are the
+//material, sphere and toon textures).
+#define BONE_TEXTURE_UNIT 3
+
 struct VertexData
 {
 	glm::vec4 position;
@@ -69,7 +73,9 @@ class VMDMotionController
 	glm::mat4 *invBindPose;
 	
 	private:
-	GLuint Bones_loc; //uniform variable location for Bones[] in shader
+	GLuint Bones_loc; //uniform location of the boneTexture sampler in the shader
+	GLuint boneBuffer; //GL_TEXTURE_BUFFER holding skinMatrix[]
+	GLuint boneTexture; //buffer texture view of boneBuffer
 	
 	std::vector<std::list<BoneFrame>> boneKeyFrames;				//Hold a list of keyframes for each Bone
 	std::vector<std::list<BoneFrame>::iterator> ite_boneKeyFrames;	//Keyframe iterator

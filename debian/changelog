@@ -1,3 +1,10 @@
+mikumikupenguin (0.1+20261010.1) unstable; urgency=medium
+
+  * Pass bone matrices through a texture buffer object; models with more
+    than 254 bones were rendered with spikes and broken polygons.
+
+ -- shitamo <sitamo@gmail.com>  Sat, 10 Oct 2026 18:50:00 +0900
+
 mikumikupenguin (0.1+20261010) unstable; urgency=medium
 
   * Initial Debian package.

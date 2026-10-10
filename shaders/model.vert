@@ -13,7 +13,16 @@ out vec2 UV;
 out vec3 normal;
 
 uniform mat4 MVP;
-uniform mat4 Bones[254];
+uniform samplerBuffer boneTexture; //skinning matrices, 4 RGBA32F texels per bone
+
+mat4 boneMatrix(int index)
+{
+	int base = index * 4;
+	return mat4(texelFetch(boneTexture, base),
+	            texelFetch(boneTexture, base + 1),
+	            texelFetch(boneTexture, base + 2),
+	            texelFetch(boneTexture, base + 3));
+}
 
 uniform bool isEdge;
 uniform float edgeSize;
@@ -39,44 +48,44 @@ void main()
 	
 	if(weightFormula==0) //BDEF1
 	{
-		newVertex  = (Bones[index1] * vPosition);
-		newNormal  = (Bones[index1] * vec4(vNormal, 0.0));
+		newVertex  = (boneMatrix(index1) * vPosition);
+		newNormal  = (boneMatrix(index1) * vec4(vNormal, 0.0));
 		
 		//newVertex = vPosition;
 	}
 	else if(weightFormula==1) //BDEF2
 	{
-		newVertex  = (Bones[index1] * vPosition)          * vBoneWeights.x;
-		newVertex += (Bones[index2] * vPosition)          * (1.0 - vBoneWeights.x);
+		newVertex  = (boneMatrix(index1) * vPosition)          * vBoneWeights.x;
+		newVertex += (boneMatrix(index2) * vPosition)          * (1.0 - vBoneWeights.x);
 		
-		newNormal  = (Bones[index1] * vec4(vNormal, 0.0)) * vBoneWeights.x;
-		newNormal += (Bones[index2] * vec4(vNormal, 0.0)) * (1.0 - vBoneWeights.x);
+		newNormal  = (boneMatrix(index1) * vec4(vNormal, 0.0)) * vBoneWeights.x;
+		newNormal += (boneMatrix(index2) * vec4(vNormal, 0.0)) * (1.0 - vBoneWeights.x);
 		
 		//newVertex = vPosition;
 	}
 	else if(weightFormula==2) //BDEF4
 	{
-		newVertex  = (Bones[index1] * vPosition)          * vBoneWeights.x;
-		newNormal  = (Bones[index1] * vec4(vNormal, 0.0)) * vBoneWeights.x;
+		newVertex  = (boneMatrix(index1) * vPosition)          * vBoneWeights.x;
+		newNormal  = (boneMatrix(index1) * vec4(vNormal, 0.0)) * vBoneWeights.x;
 		
-		newVertex += (Bones[index2] * vPosition)          * vBoneWeights.y;
-		newNormal += (Bones[index2] * vec4(vNormal, 0.0)) * vBoneWeights.y;
+		newVertex += (boneMatrix(index2) * vPosition)          * vBoneWeights.y;
+		newNormal += (boneMatrix(index2) * vec4(vNormal, 0.0)) * vBoneWeights.y;
 		
-		newVertex += (Bones[index3] * vPosition)          * vBoneWeights.z;
-		newNormal += (Bones[index3] * vec4(vNormal, 0.0)) * vBoneWeights.z;
+		newVertex += (boneMatrix(index3) * vPosition)          * vBoneWeights.z;
+		newNormal += (boneMatrix(index3) * vec4(vNormal, 0.0)) * vBoneWeights.z;
 		
-		newVertex += (Bones[index4] * vPosition)          * vBoneWeights.w;
-		newNormal += (Bones[index4] * vec4(vNormal, 0.0)) * vBoneWeights.w;
+		newVertex += (boneMatrix(index4) * vPosition)          * vBoneWeights.w;
+		newNormal += (boneMatrix(index4) * vec4(vNormal, 0.0)) * vBoneWeights.w;
 		
 		//newVertex = vPosition;
 	}
 	else if(weightFormula==3) //Fake SDEF by using BDEF2 formula
 	{
-		newVertex  = (Bones[index1] * vPosition)          * vBoneWeights.x;
-		newVertex += (Bones[index2] * vPosition)          * (1.0 - vBoneWeights.x);
+		newVertex  = (boneMatrix(index1) * vPosition)          * vBoneWeights.x;
+		newVertex += (boneMatrix(index2) * vPosition)          * (1.0 - vBoneWeights.x);
 		
-		newNormal  = (Bones[index1] * vec4(vNormal, 0.0)) * vBoneWeights.x;
-		newNormal += (Bones[index2] * vec4(vNormal, 0.0)) * (1.0 - vBoneWeights.x);
+		newNormal  = (boneMatrix(index1) * vec4(vNormal, 0.0)) * vBoneWeights.x;
+		newNormal += (boneMatrix(index2) * vec4(vNormal, 0.0)) * (1.0 - vBoneWeights.x);
 		
 		//newVertex = vPosition;
 	}

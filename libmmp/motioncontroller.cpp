@@ -30,7 +30,21 @@ VMDMotionController::VMDMotionController(PMXInfo &pmxInfovar,VMDInfo &vmdInfovar
 	}
 	skinMatrix=new glm::mat4[pmxInfo.bone_continuing_datasets]();
 	
-	Bones_loc=glGetUniformLocation(shaderProgram,"Bones");
+	//Bone matrices are passed to the shader through a texture buffer object.
+	//A plain "uniform mat4 Bones[N]" array is limited by
+	//GL_MAX_VERTEX_UNIFORM_COMPONENTS (often 4096 floats = 256 matrices),
+	//and many current models have more bones than that.
+	Bones_loc=glGetUniformLocation(shaderProgram,"boneTexture");
+	glGenBuffers(1, &boneBuffer);
+	glBindBuffer(GL_TEXTURE_BUFFER, boneBuffer);
+	glBufferData(GL_TEXTURE_BUFFER, sizeof(glm::mat4)*(pmxInfo.bone_continuing_datasets>0 ? pmxInfo.bone_continuing_datasets : 1), NULL, GL_DYNAMIC_DRAW);
+	glGenTextures(1, &boneTexture);
+	glActiveTexture(GL_TEXTURE0 + BONE_TEXTURE_UNIT);
+	glBindTexture(GL_TEXTURE_BUFFER, boneTexture);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, boneBuffer);
+	glActiveTexture(GL_TEXTURE0);
+	glBindBuffer(GL_TEXTURE_BUFFER, 0);
+	glUniform1i(Bones_loc, BONE_TEXTURE_UNIT);
 	
 	
 	boneKeyFrames.resize(pmxInfo.bone_continuing_datasets);
@@ -134,8 +148,10 @@ VMDMotionController::VMDMotionController(PMXInfo &pmxInfovar,VMDInfo &vmdInfovar
 }
 VMDMotionController::~VMDMotionController()
 {
-	free(invBindPose);
-	free(skinMatrix);
+	delete[] invBindPose;
+	delete[] skinMatrix;
+	glDeleteTextures(1, &boneTexture);
+	glDeleteBuffers(1, &boneBuffer);
 	//free(vertexData);
 }
 
@@ -206,7 +222,13 @@ void VMDMotionController::updateVertexMorphs()
 
 void VMDMotionController::updateBoneMatrix()
 {	
-	glUniformMatrix4fv(Bones_loc, pmxInfo.bone_continuing_datasets, GL_FALSE, (const GLfloat*)skinMatrix);
+	glBindBuffer(GL_TEXTURE_BUFFER, boneBuffer);
+	glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(glm::mat4)*pmxInfo.bone_continuing_datasets, skinMatrix);
+	glBindBuffer(GL_TEXTURE_BUFFER, 0);
+	
+	glActiveTexture(GL_TEXTURE0 + BONE_TEXTURE_UNIT);
+	glBindTexture(GL_TEXTURE_BUFFER, boneTexture);
+	glActiveTexture(GL_TEXTURE0);
 }
 
 void VMDMotionController::updateBoneAnimation()

@@ -11,6 +11,9 @@ October 10, 2026:
 -Build system: pkg-config for dependencies, headers installed under
  include/libmmp, generated autotools files removed (run ./autogen.sh)
 -Added Debian packaging
+-Bone matrices are passed through a texture buffer instead of a
+ uniform array limited to 254 bones (models with more bones showed
+ spikes and garbage polygons, e.g. around skirts)
 
 January 12, 2014:
 -removed model data file from git repo history
