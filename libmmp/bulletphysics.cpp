@@ -86,8 +86,6 @@ float mass, float restitution, float friction, float linear_damp, float angular_
 	body->setRestitution(restitution);
 	body->setFriction(friction);
 	body->setDamping(linear_damp, angular_damp);
-	float linearDamp = body->getLinearDamping();
-	float angularDamp = body->getAngularDamping();
 	if (kinematic) {
 		body->setCollisionFlags( body->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
 	}

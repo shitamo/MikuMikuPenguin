@@ -3,29 +3,22 @@
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export DEB_CXXFLAGS_MAINT_APPEND = -Wno-sign-compare -Wno-unused-variable -Wno-unused-but-set-variable
 
-# Build out of tree so the source tree never contains configure results.
 %:
-	dh $@ --builddirectory=debian/build
+	dh $@ --buildsystem=meson
 
-# libmmp has no stable API/ABI yet, so build it as a static library only
-# and link the viewer against it.
+# libmmp has no stable API/ABI yet, so it is built as a static library only
+# (meson default_library=static) and the viewer links against it.
 override_dh_auto_configure:
-	dh_auto_configure -- --disable-shared --enable-sound
+	dh_auto_configure -- -Dsound=enabled
 
-override_dh_auto_install:
-	dh_auto_install
-	find debian/tmp -name '*.la' -delete
-
-# Also remove the results of an in-tree ./configure && make (manual builds,
-# or older versions of this package).  "make distclean" with such a stale
-# Makefile can fail because it tries to regenerate the build system, so do
-# not rely on it.
+# Remove leftovers of the former autotools build system (in-tree
+# ./configure && make from older versions), which are not part of the source.
 override_dh_auto_clean:
 	dh_auto_clean
-	-[ ! -f config.status ] || $(MAKE) distclean
-	rm -f config.status config.log config.h stamp-h1 libtool src/pmx
+	rm -rf autom4te.cache build-aux
+	rm -f config.status config.log config.h stamp-h1 libtool aclocal.m4 configure src/pmx
 	find . -path ./debian -prune -o -path ./.git -prune -o \
-	    \( -name Makefile -o -name '*.o' -o -name '*.lo' -o -name '*.la' -o -name '*.a' \) \
+	    \( -name Makefile -o -name Makefile.in -o -name '*.o' -o -name '*.lo' -o -name '*.la' -o -name '*.a' \) \
 	    -type f -print0 | xargs -0r rm -f
 	find . -path ./debian -prune -o -path ./.git -prune -o \
 	    \( -name .deps -o -name .libs \) -type d -print0 | xargs -0r rm -rf

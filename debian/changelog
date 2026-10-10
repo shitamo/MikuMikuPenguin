@@ -1,3 +1,11 @@
+mikumikupenguin (0.2.1+20261011.3) unstable; urgency=medium
+
+  * Switch the upstream build system from autotools to Meson.
+  * libmmp-dev: ship libmmp.pc.
+  * Drop the obsolete Travis CI configuration.
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 04:45:00 +0900
+
 mikumikupenguin (0.2.1+20261011.2) unstable; urgency=medium
 
   * Frame the whole model with the default camera (MMD-like 30 degree

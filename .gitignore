@@ -1,4 +1,9 @@
-# autotools generated files
+# Meson build directories
+/build*/
+/_build/
+/builddir/
+
+# leftovers of the former autotools build system
 Makefile
 Makefile.in
 /aclocal.m4

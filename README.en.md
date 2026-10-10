@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/sn0w75/MikuMikuPenguin.png)](https://travis-ci.org/sn0w75/MikuMikuPenguin)
-
 # LibMikuMikuPenguin(libmmp) v0.2 Readme (English)
 Hello~
 
@@ -20,7 +18,7 @@ This tree is based on v0.2.1 with the following changes so that it builds and ru
 * Fixed crashes with models of more than 32767 vertices, texture index -1, etc.
 * Case-insensitive texture lookup
 * Playback speed no longer depends on the monitor refresh rate
-* autotools use pkg-config (run `./autogen.sh` when building from git)
+* Build system changed from autotools to Meson
 * Debian packaging (debian/)
 
 Requirements: GLFW 3, libepoxy, GLM, Bullet, stb_image (SDL3_mixer or SDL2_mixer for music), OpenGL 3.2 core profile
@@ -54,23 +52,21 @@ https://github.com/g-truc/glm/issues/15
 To avoid this bug, you must use the -fpermissive flag.
 So like this:
 
-    $ export CXXFLAGS="-fpermissive"
-    $ autoreconf -i
-    $ ./configure
-    # make install
+    $ CXXFLAGS="-fpermissive" meson setup build
 
 ## Installation
-This source code uses autotools, so compiling the code is very simple:
+The build uses Meson and Ninja (replaced autotools in the 2026 update):
 
-To compile, run the following commands in a terminal:
-
-    $ autoreconf -i
-    $ ./configure
-    $ make
+    $ meson setup build
+    $ meson compile -C build
+    $ meson test -C build        # unit tests
 
 To install libmmp and PMXViewer on your system, run:
 
-    $ sudo make install
+    $ sudo meson install -C build
+
+Use `meson setup build -Dsound=disabled` to build without music playback.
+A Debian package can be built with `dpkg-buildpackage -us -uc -b`.
 
 ## Troubleshooting
 * On OSX, there's currently an issue with software rendering occurring when using too many transformation matrices in the vertex shader. You can reduce the number in shaders/model.vert, but if you don't have enough the model view may break. (We're working on a more permanent solution to this)

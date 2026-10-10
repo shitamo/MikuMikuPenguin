@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/sn0w75/MikuMikuPenguin.png)](https://travis-ci.org/sn0w75/MikuMikuPenguin)
-
 **WARNING**
 THIS FILE IS ENCODED IN UTF-8, NOT SJIS!!!
 
@@ -29,7 +27,7 @@ https://github.com/sn0w75/MikuMikuPenguin/
 * 頂点数 32767 超のモデルでのクラッシュ、テクスチャ番号 -1 などのクラッシュを修正
 * テクスチャ名の大文字小文字を区別せずに検索
 * 再生速度をモニタのリフレッシュレートに依存しないよう修正
-* autotools は pkg-config で依存を検出（git から取得した場合は `./autogen.sh` を実行）
+* ビルドシステムを autotools から Meson に変更
 * Debian パッケージ（debian/）を追加
 
 必要なもの: GLFW 3, libepoxy, GLM, Bullet, stb_image（音楽再生には SDL3_mixer または SDL2_mixer）、OpenGL 3.2 core profile
@@ -65,28 +63,23 @@ https://github.com/g-truc/glm/issues/15
 
 このバグを回避する為には、-fpermissiveを使う必要があります。例えば：
 
-    $ export CXXFLAGS="-fpermissive"
-    $ autoreconf -i
-    $ ./configure
-    # make install
+    $ CXXFLAGS="-fpermissive" meson setup build
 
 みたいな感じです。
 
 ## インストール
-このソースコードはautotoolsを利用していますので、コンパイルやインストールは簡単です：
+ビルドには Meson と Ninja を使います（2026年版で autotools から変更）。
 
-コンパイルするにはターミナルで：
+    $ meson setup build
+    $ meson compile -C build
+    $ meson test -C build        # 単体テスト
 
-    $ autoreconf -i
-    $ ./configure
-    $ make
+システムにインストールする場合は：
 
-をすれば大丈夫です。
-またシステムにインストールしたい場合は：
+    $ sudo meson install -C build
 
-    $ sudo make install
-
-みたいな感じで大丈夫です。
+音楽再生を無効にするには `meson setup build -Dsound=disabled` とします。
+Debian パッケージは `dpkg-buildpackage -us -uc -b` で作れます。
 
 ***注意！！！***
 現在WindowsでビルドするにはMinGWを使う必要があります。詳細についてはsn0w75氏を連絡。

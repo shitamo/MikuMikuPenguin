@@ -52,6 +52,8 @@ October 10, 2026 (merge of weimingtom/MMP v0.2.1):
 -Default camera frames the whole model from the front (computed from the
  model's bounding box, MMD's 30 degree field of view); zoom/move steps
  scale with the model size; R resets the camera
+-Build system switched from autotools to Meson (meson setup build &&
+ meson compile -C build); a libmmp.pc pkg-config file is installed
 
 October 10, 2026:
 -Ported from GLFW 2 to GLFW 3 (GLFW 2 is no longer shipped by distributions)
