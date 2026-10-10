@@ -11,7 +11,7 @@
 
 enum VAO_IDs { Vertices, NumVAOs };
 enum Buffer_IDs { VertexArrayBuffer, VertexIndexBuffer, RecordBuffer, NumBuffers };
-enum Attrib_IDs { vPosition, vUV, vNormal, vBoneIndices, vBoneWeights, vWeightFormula };
+enum Attrib_IDs { vPosition, vUV, vNormal, vBoneIndices, vBoneWeights, vWeightFormula, vSdefC, vSdefR0, vSdefR1 };
 enum Uniform_IDs { 
 	uAmbient,uDiffuse,uSpecular,uShininess,
 	uIsEdge,uEdgeColor,uEdgeSize,

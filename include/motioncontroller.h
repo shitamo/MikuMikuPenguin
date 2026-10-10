@@ -128,6 +128,12 @@ struct VertexData
 	GLfloat weight3;
 	GLfloat weight4;
 
+	//SDEF parameters (only used when weightFormula==3).  sdefR0/sdefR1 hold
+	//the pre-processed "(C + r0)/2" / "(C + r1)/2" points.
+	glm::vec3 sdefC;
+	glm::vec3 sdefR0;
+	glm::vec3 sdefR1;
+
 	std::string str()
 	{	
 		std::stringstream ss;

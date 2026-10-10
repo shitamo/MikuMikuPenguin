@@ -7,6 +7,7 @@
 #include <SOIL/SOIL.h>
 
 #include <cstdio>
+#include <cstddef>
 #include <cstring>
 #include <strings.h>
 #include <unistd.h>
@@ -437,6 +438,18 @@ void Viewer::initBuffers()
 	glVertexAttribPointer(vWeightFormula, 1, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(glm::vec4)+sizeof(glm::vec2)+sizeof(glm::vec3)));
 	glBindAttribLocation(shaderProgram, vWeightFormula, "vWeightFormula");
 	glEnableVertexAttribArray(vWeightFormula);
+
+	glVertexAttribPointer(vSdefC, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(offsetof(VertexData, sdefC)));
+	glBindAttribLocation(shaderProgram, vSdefC, "vSdefC");
+	glEnableVertexAttribArray(vSdefC);
+
+	glVertexAttribPointer(vSdefR0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(offsetof(VertexData, sdefR0)));
+	glBindAttribLocation(shaderProgram, vSdefR0, "vSdefR0");
+	glEnableVertexAttribArray(vSdefR0);
+
+	glVertexAttribPointer(vSdefR1, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(offsetof(VertexData, sdefR1)));
+	glBindAttribLocation(shaderProgram, vSdefR1, "vSdefR1");
+	glEnableVertexAttribArray(vSdefR1);
 }
 
 //Windows-made models often reference textures with different letter case

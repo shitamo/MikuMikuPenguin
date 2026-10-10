@@ -10,11 +10,60 @@ in vec4 vBoneIndices;
 in vec4 vBoneWeights;
 in float vWeightFormula;
 
+in vec3 vSdefC;  //SDEF centre
+in vec3 vSdefR0; //SDEF pre-processed rotation centre for bone 1
+in vec3 vSdefR1; //SDEF pre-processed rotation centre for bone 2
+
 out vec2 UV;
 out vec3 normal;
 
 uniform mat4 MVP;
 uniform samplerBuffer boneTexture; //skinning matrices, 4 RGBA32F texels per bone
+
+vec4 quatFromMat3(mat3 m)
+{
+	//m[col][row]
+	float tr = m[0][0] + m[1][1] + m[2][2];
+	vec4 q;
+	if(tr > 0.0)
+	{
+		float s = sqrt(tr + 1.0) * 2.0;
+		q = vec4((m[1][2] - m[2][1]) / s, (m[2][0] - m[0][2]) / s, (m[0][1] - m[1][0]) / s, 0.25 * s);
+	}
+	else if(m[0][0] > m[1][1] && m[0][0] > m[2][2])
+	{
+		float s = sqrt(1.0 + m[0][0] - m[1][1] - m[2][2]) * 2.0;
+		q = vec4(0.25 * s, (m[1][0] + m[0][1]) / s, (m[2][0] + m[0][2]) / s, (m[1][2] - m[2][1]) / s);
+	}
+	else if(m[1][1] > m[2][2])
+	{
+		float s = sqrt(1.0 + m[1][1] - m[0][0] - m[2][2]) * 2.0;
+		q = vec4((m[1][0] + m[0][1]) / s, 0.25 * s, (m[2][1] + m[1][2]) / s, (m[2][0] - m[0][2]) / s);
+	}
+	else
+	{
+		float s = sqrt(1.0 + m[2][2] - m[0][0] - m[1][1]) * 2.0;
+		q = vec4((m[2][0] + m[0][2]) / s, (m[2][1] + m[1][2]) / s, 0.25 * s, (m[0][1] - m[1][0]) / s);
+	}
+	return normalize(q); //(x, y, z, w)
+}
+
+mat3 mat3FromQuat(vec4 q)
+{
+	float x = q.x, y = q.y, z = q.z, w = q.w;
+	return mat3(1.0 - 2.0*(y*y + z*z), 2.0*(x*y + z*w),       2.0*(x*z - y*w),
+	            2.0*(x*y - z*w),       1.0 - 2.0*(x*x + z*z), 2.0*(y*z + x*w),
+	            2.0*(x*z + y*w),       2.0*(y*z - x*w),       1.0 - 2.0*(x*x + y*y));
+}
+
+vec4 quatSlerp(vec4 a, vec4 b, float t)
+{
+	float d = dot(a, b);
+	if(d < 0.0) { b = -b; d = -d; }
+	if(d > 0.9995) return normalize(mix(a, b, t));
+	float th = acos(clamp(d, -1.0, 1.0));
+	return (a * sin((1.0 - t) * th) + b * sin(t * th)) / sin(th);
+}
 
 mat4 boneMatrix(int index)
 {
@@ -80,17 +129,22 @@ void main()
 		
 		//newVertex = vPosition;
 	}
-	else if(weightFormula==3) //Fake SDEF by using BDEF2 formula
+	else if(weightFormula==3) //SDEF (spherical deform)
 	{
-		newVertex  = (boneMatrix(index1) * vPosition)          * vBoneWeights.x;
-		newVertex += (boneMatrix(index2) * vPosition)          * (1.0 - vBoneWeights.x);
+		float w0 = vBoneWeights.x;
+		float w1 = 1.0 - w0;
+		mat4 m0 = boneMatrix(index1);
+		mat4 m1 = boneMatrix(index2);
 		
-		newNormal  = (boneMatrix(index1) * vec4(vNormal, 0.0)) * vBoneWeights.x;
-		newNormal += (boneMatrix(index2) * vec4(vNormal, 0.0)) * (1.0 - vBoneWeights.x);
+		mat3 rot = mat3FromQuat(quatSlerp(quatFromMat3(mat3(m0)), quatFromMat3(mat3(m1)), w1));
 		
-		//newVertex = vPosition;
+		vec3 p = rot * (vPosition.xyz - vSdefC)
+		       + (m0 * vec4(vSdefR0, 1.0)).xyz * w0
+		       + (m1 * vec4(vSdefR1, 1.0)).xyz * w1;
+		newVertex = vec4(p, 1.0);
+		newNormal = vec4(rot * vNormal, 0.0);
 	}
-	else // TODO: SDEF (weightFormula==3), QDEF (weightFormula==4)
+	else // TODO: QDEF (weightFormula==4)
 	{
 		newVertex=vPosition;
 		//newVertex = vec4(0.0,0.0,0.0,0.0);

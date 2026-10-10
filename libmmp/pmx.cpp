@@ -250,6 +250,10 @@ namespace ClosedMMDFormat
 				miku.read((char*)&vertex->R1.x, 4);
 				miku.read((char*)&vertex->R1.y, 4);
 				miku.read((char*)&vertex->R1.z, 4);
+				//convert to OpenGL (right-handed) coordinates like the vertex position
+				vertex->C.z  = -vertex->C.z;
+				vertex->R0.z = -vertex->R0.z;
+				vertex->R1.z = -vertex->R1.z;
 				
 				//cerr<<"ERROR: SDEF unsupported in shader currently, please add support!"<<endl;
 				//cerr<<"(The program is being forcibly closed because lack of SDEF support is suspected to cause issues in basic model loading and animation"<<endl;

@@ -110,6 +110,25 @@ VMDMotionController::VMDMotionController(PMXInfo &pmxInfo,VMDInfo &vmdInfo,GLuin
 		vertexData[i].weight2=pmxInfo.vertices[i]->weight2;
 		vertexData[i].weight3=pmxInfo.vertices[i]->weight3;
 		vertexData[i].weight4=pmxInfo.vertices[i]->weight4;
+		
+		//SDEF: pre-compute the per-bone rotation centres (same as MMD/saba)
+		{
+			PMXVertex *v=pmxInfo.vertices[i];
+			glm::vec3 C(0.0f), cr0(0.0f), cr1(0.0f);
+			if(v->weight_transform_formula==WEIGHT_FORMULA_SDEF)
+			{
+				float w0=v->weight1, w1=1.0f-v->weight1;
+				glm::vec3 rw = v->R0*w0 + v->R1*w1;
+				glm::vec3 r0 = v->C + v->R0 - rw;
+				glm::vec3 r1 = v->C + v->R1 - rw;
+				C   = v->C;
+				cr0 = (v->C + r0)*0.5f;
+				cr1 = (v->C + r1)*0.5f;
+			}
+			vertexData[i].sdefC=C;
+			vertexData[i].sdefR0=cr0;
+			vertexData[i].sdefR1=cr1;
+		}
                    
 		//cout<<vertexData[i].position.x<<" "<<vertexData[i].position.y<<" "<<vertexData[i].position.z<<" "<<vertexData[i].position.w<<endl;
 		//cout<<vertexData[i].UV.x<<" "<<vertexData[i].UV.y<<endl;
