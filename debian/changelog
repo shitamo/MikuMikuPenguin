@@ -1,3 +1,12 @@
+mikumikupenguin (0.2.1+20261010.8) unstable; urgency=medium
+
+  * Use libepoxy instead of GLEW for OpenGL function loading.
+  * Use SDL3_mixer for music playback (SDL2_mixer is still supported as a
+    fallback at configure time).
+  * Keep Ctrl-C/SIGTERM working while music is enabled.
+
+ -- shitamo <sitamo@gmail.com>  Sat, 10 Oct 2026 23:59:00 +0900
+
 mikumikupenguin (0.2.1+20261010.7) unstable; urgency=medium
 
   * Load textures with stb_image (libstb-dev) instead of SOIL; 16-bit PNG

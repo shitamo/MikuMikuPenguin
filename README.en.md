@@ -15,6 +15,7 @@ https://github.com/sn0w75/MikuMikuPenguin/
 This tree is based on v0.2.1 with the following changes so that it builds and runs on current Linux:
 
 * GLFW 2 -> GLFW 3, current GLM (0.9.9 / 1.x)
+* GL loader GLEW -> libepoxy, image loading SOIL -> stb_image, music via SDL3_mixer (falls back to SDL2_mixer)
 * Bone matrices are passed through a texture buffer (no 251-bone limit)
 * Fixed crashes with models of more than 32767 vertices, texture index -1, etc.
 * Case-insensitive texture lookup
@@ -22,7 +23,7 @@ This tree is based on v0.2.1 with the following changes so that it builds and ru
 * autotools use pkg-config (run `./autogen.sh` when building from git)
 * Debian packaging (debian/)
 
-Requirements: GLFW 3, GLEW, GLM, Bullet, stb_image (SDL2 and SDL2_mixer for music), OpenGL 3.2 core profile
+Requirements: GLFW 3, libepoxy, GLM, Bullet, stb_image (SDL3_mixer or SDL2_mixer for music), OpenGL 3.2 core profile
 
 ## Contents
 The contents are listed below:

@@ -6,6 +6,7 @@ AC_INIT([MikuMikuPenguin], [0.2.1], [ibenrunnin@gmail.com])
 AC_CONFIG_SRCDIR([libmmp/pmx.cpp])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
+AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([foreign subdir-objects])
 LT_PREREQ([2.2])
 LT_INIT([dlopen])
@@ -29,7 +30,7 @@ AC_SUBST([MMP_CXXSTD])
 
 # Checks for libraries.
 PKG_CHECK_MODULES([GLFW], [glfw3 >= 3.0])
-PKG_CHECK_MODULES([GLEW], [glew])
+PKG_CHECK_MODULES([EPOXY], [epoxy])
 PKG_CHECK_MODULES([GL], [gl])
 PKG_CHECK_MODULES([BULLET], [bullet])
 
@@ -43,16 +44,19 @@ PKG_CHECK_MODULES([STB], [stb], [],
      [AC_MSG_ERROR([stb_image (libstb-dev) not found])])])
 
 AC_ARG_ENABLE([sound],
-  [AS_HELP_STRING([--disable-sound], [Disable music playback via SDL2_mixer @<:@default=check@:>@])],
+  [AS_HELP_STRING([--disable-sound], [Disable music playback via SDL3_mixer/SDL2_mixer @<:@default=check@:>@])],
   [:],
   [enable_sound=check])
+sound_backend=none
 AS_IF([test "$enable_sound" != "no"],
-  [PKG_CHECK_MODULES([SDL2MIXER],
-    [sdl2 SDL2_mixer],
-    [enable_sound=yes],
-    [AS_IF([test "$enable_sound" = "yes"],
-      [AC_MSG_ERROR([SDL2_mixer required, but not found.])],
-      [enable_sound=no])])])
+  [PKG_CHECK_MODULES([SOUND], [sdl3 sdl3-mixer],
+    [enable_sound=yes; sound_backend="SDL3_mixer"
+     AC_DEFINE([MMP_SDL3_MIXER], [1], [Use SDL3_mixer for music playback])],
+    [PKG_CHECK_MODULES([SOUND], [sdl2 SDL2_mixer],
+      [enable_sound=yes; sound_backend="SDL2_mixer"],
+      [AS_IF([test "$enable_sound" = "yes"],
+        [AC_MSG_ERROR([SDL3_mixer or SDL2_mixer required, but not found.])],
+        [enable_sound=no])])])])
 AM_CONDITIONAL([ENABLE_SOUND], [test "$enable_sound" = "yes"])
 
 # Checks for header files.
@@ -75,5 +79,5 @@ AC_OUTPUT
 AC_MSG_NOTICE([
   MikuMikuPenguin $PACKAGE_VERSION
     C++ standard : $MMP_CXXSTD
-    Sound (SDL2_mixer) : $enable_sound
+    Sound              : $enable_sound ($sound_backend)
 ])

@@ -6,12 +6,11 @@ Build-Depends: debhelper-compat (= 13),
                pkgconf | pkg-config,
                libgl-dev,
                libglfw3-dev,
-               libglew-dev,
+               libepoxy-dev,
                libglm-dev,
                libbullet-dev,
                libstb-dev,
-               libsdl2-dev,
-               libsdl2-mixer-dev
+               libsdl3-mixer-dev | libsdl2-mixer-dev
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
 Homepage: https://github.com/weimingtom/MMP
@@ -32,7 +31,7 @@ Section: libdevel
 Architecture: any
 Depends: libgl-dev,
          libglfw3-dev,
-         libglew-dev,
+         libepoxy-dev,
          libglm-dev,
          libbullet-dev,
          ${misc:Depends}

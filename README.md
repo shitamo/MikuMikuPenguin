@@ -24,6 +24,7 @@ https://github.com/sn0w75/MikuMikuPenguin/
 このツリーは v0.2.1 をベースに、現在の Linux で動くよう次の変更を加えたものです。
 
 * GLFW 2 → GLFW 3 へ移行、新しい GLM (0.9.9 / 1.x) に対応
+* OpenGL ローダーを GLEW から libepoxy へ、画像読み込みを SOIL から stb_image へ、音楽再生は SDL3_mixer に対応（無ければ SDL2_mixer）
 * ボーン行列をテクスチャバッファで渡すように変更（ボーン数 251 本の上限を撤廃）
 * 頂点数 32767 超のモデルでのクラッシュ、テクスチャ番号 -1 などのクラッシュを修正
 * テクスチャ名の大文字小文字を区別せずに検索
@@ -31,7 +32,7 @@ https://github.com/sn0w75/MikuMikuPenguin/
 * autotools は pkg-config で依存を検出（git から取得した場合は `./autogen.sh` を実行）
 * Debian パッケージ（debian/）を追加
 
-必要なもの: GLFW 3, GLEW, GLM, Bullet, stb_image（音楽再生には SDL2, SDL2_mixer）、OpenGL 3.2 core profile
+必要なもの: GLFW 3, libepoxy, GLM, Bullet, stb_image（音楽再生には SDL3_mixer または SDL2_mixer）、OpenGL 3.2 core profile
 
 ## ディレクトリ構成
 

@@ -656,20 +656,12 @@ void Viewer::initGLFW()
 	glfwSwapInterval(1);
 	glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
 
-	// Initialize GLEW
-	glewExperimental=GL_TRUE; //Needed in core profile
-	GLenum glewStatus=glewInit();
-#ifdef GLEW_ERROR_NO_GLX_DISPLAY
-	//GLEW built for GLX reports this under Wayland/EGL even though the
-	//function pointers were loaded successfully.
-	if(glewStatus==GLEW_ERROR_NO_GLX_DISPLAY) glewStatus=GLEW_OK;
-#endif
-	if(glewStatus != GLEW_OK)
+	//GL entry points are resolved by libepoxy on first use; nothing to initialise.
+	if(epoxy_gl_version() < 32)
 	{
-		fprintf(stderr, "Failed to initialize GLEW: %s\n", glewGetErrorString(glewStatus));
+		fprintf(stderr, "OpenGL 3.2 or newer is required (got %d.%d)\n", epoxy_gl_version()/10, epoxy_gl_version()%10);
 		exit(EXIT_FAILURE);
 	}
-	while(glGetError()!=GL_NO_ERROR) {} //glewInit may leave a harmless GL_INVALID_ENUM
 	
 	//Ensure we can capture the escape key being pressed below
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);

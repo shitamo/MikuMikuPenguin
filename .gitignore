@@ -34,3 +34,6 @@ data/model/
 data/motion/
 data/stage/
 build/
+/config.h
+/config.h.in
+/config.h.in~
