@@ -240,6 +240,18 @@ void VMDMotionController::updateVertexMorphs()
 		vertexData[i].UV.y=pmxInfo.vertices[i]->UV.y;
 	}
 	
+	const int extraUVCount = pmxInfo.extraUVCount>4 ? 4 : (int)pmxInfo.extraUVCount;
+	if(extraUVCount>0)
+	{
+		extraUVs.resize((size_t)pmxInfo.vertex_continuing_datasets*4);
+		for(int i=0; i<pmxInfo.vertex_continuing_datasets; i++)
+			for(int k=0; k<4; ++k) extraUVs[(size_t)i*4+k]=pmxInfo.vertices[i]->extraUV[k];
+	}
+	
+	//bone morph accumulators
+	boneMorphPos.assign(pmxInfo.bone_continuing_datasets, glm::vec3(0.0f));
+	boneMorphRot.assign(pmxInfo.bone_continuing_datasets, glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
+	
 	//***4. Vertex and UV morphs***
 	for(int i=0; i<morphCount; ++i)
 	{
@@ -270,7 +282,30 @@ void VMDMotionController::updateVertexMorphs()
 				uv.y+=uvMorph->UVOffsetAmount.y * w;
 			}
 		}
-		//TODO: extra UV morphs (types 4-7) need extra UV support
+		else if(morph->type>=MORPH_TYPE_EXTRA_UV1 && morph->type<=MORPH_TYPE_EXTRA_UV4)
+		{
+			int k=morph->type-MORPH_TYPE_EXTRA_UV1;
+			if(k>=extraUVCount) continue;
+			for(int j=0; j<morph->morphOffsetNum; ++j)
+			{
+				PMXUVMorph *uvMorph=(PMXUVMorph*) morph->offsetData[j];
+				if(uvMorph->vertexIndex<0 || uvMorph->vertexIndex>=pmxInfo.vertex_continuing_datasets) continue;
+				extraUVs[(size_t)uvMorph->vertexIndex*4+k]+=uvMorph->UVOffsetAmount * w;
+			}
+		}
+		else if(morph->type==MORPH_TYPE_BONE)
+		{
+			for(int j=0; j<morph->morphOffsetNum; ++j)
+			{
+				PMXBoneMorph *bMorph=(PMXBoneMorph*) morph->offsetData[j];
+				if(bMorph->boneIndex<0 || bMorph->boneIndex>=pmxInfo.bone_continuing_datasets) continue;
+				boneMorphPos[bMorph->boneIndex]+=bMorph->inertia * w;
+				glm::quat q(bMorph->rotationAmount.w, bMorph->rotationAmount.x, bMorph->rotationAmount.y, bMorph->rotationAmount.z);
+				if(glm::length(q)<1.0e-6f) continue;
+				q=glm::normalize(q);
+				boneMorphRot[bMorph->boneIndex]=glm::normalize(boneMorphRot[bMorph->boneIndex] * glm::slerp(glm::quat(1.0f,0.0f,0.0f,0.0f), q, w));
+			}
+		}
 	}
 	
 	//***5. Material morphs***
@@ -372,6 +407,22 @@ void VMDMotionController::updateBoneMatrix()
 	glActiveTexture(GL_TEXTURE0);
 }
 
+//Bone pose from the VMD plus bone morphs
+glm::vec3 VMDMotionController::animatedPosition(int i) const
+{
+	glm::vec3 p=bonePos[i];
+	if(i<(int)boneMorphPos.size()) p+=boneMorphPos[i];
+	return p;
+}
+
+glm::quat VMDMotionController::animatedRotation(int i) const
+{
+	glm::quat r=boneRot[i];
+	if(glm::length(r)<1.0e-6f) r=glm::quat(1.0f,0.0f,0.0f,0.0f);
+	if(i<(int)boneMorphRot.size()) r=r*boneMorphRot[i];
+	return r;
+}
+
 void VMDMotionController::updateBoneAnimation()
 {
 	//cout<<"Bezier interpol: "<<bezier(0.25f,0.25f,0.1f,0.25f,1.0f)<<endl;
@@ -440,13 +491,15 @@ void VMDMotionController::updateBoneAnimation()
 		//bones without keyframes (IK links such as 腕W/ひじW/ひざ) kept the
 		//previous frame's IK result, so their twist drifted over time and
 		//the skin weighted to them collapsed (arms looked thin).
+		glm::vec3 pos=animatedPosition(i);
+		glm::quat rot=animatedRotation(i);
 		if(b->parent)
 		{
-			b->Local = glm::translate( bonePos[i] + b->position - b->parent->position ) * glm::toMat4(boneRot[i]);
+			b->Local = glm::translate( pos + b->position - b->parent->position ) * glm::toMat4(rot);
 		}
 		else
 		{
-			b->Local = glm::translate( bonePos[i] + b->position ) * glm::toMat4(boneRot[i]);
+			b->Local = glm::translate( pos + b->position ) * glm::toMat4(rot);
 		}
 	}
 
@@ -506,8 +559,8 @@ void VMDMotionController::applyInheritance(int i, std::vector<char> &state)
 		PMXBone *src=pmxInfo.bones[b->givenParentBoneIndex];
 		
 		//This bone's own animated pose (keyframes; bones without keys stay at rest)
-		glm::quat ownRot=boneRot[i];
-		glm::vec3 ownPos=bonePos[i];
+		glm::quat ownRot=animatedRotation(i);
+		glm::vec3 ownPos=animatedPosition(i);
 		if(glm::length(ownRot)<1.0e-6f) ownRot=glm::quat(1.0f,0.0f,0.0f,0.0f);
 		
 		glm::quat rot=ownRot;

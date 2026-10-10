@@ -207,9 +207,14 @@ namespace ClosedMMDFormat
 			miku.read((char*)&vertex->UV.x, 4);
 			miku.read((char*)&vertex->UV.y, 4);
 		
-			if (pmxInfo.extraUVCount > 0) {
-				cerr<<"ERROR: please add support for extra UVs"<<endl;
-				exit(EXIT_FAILURE);
+			//***Additional UVs (0-4 vec4s)***
+			for(int k = 0; k < 4; ++k) vertex->extraUV[k] = glm::vec4(0.0f);
+			for(int k = 0; k < (int)pmxInfo.extraUVCount && k < 4; ++k)
+			{
+				miku.read((char*)&vertex->extraUV[k].x, 4);
+				miku.read((char*)&vertex->extraUV[k].y, 4);
+				miku.read((char*)&vertex->extraUV[k].z, 4);
+				miku.read((char*)&vertex->extraUV[k].w, 4);
 			}
 		
 			miku.read((char*)&vertex->weight_transform_formula, 1);
@@ -679,6 +684,11 @@ namespace ClosedMMDFormat
 						miku.read((char*)&boneMorph->rotationAmount.y, 4);
 						miku.read((char*)&boneMorph->rotationAmount.z, 4);
 						miku.read((char*)&boneMorph->rotationAmount.w, 4);
+						
+						//Direct3D (left-handed) -> OpenGL (right-handed), as for VMD bone frames
+						boneMorph->inertia.z = -boneMorph->inertia.z;
+						boneMorph->rotationAmount.x = -boneMorph->rotationAmount.x;
+						boneMorph->rotationAmount.y = -boneMorph->rotationAmount.y;
 					
 						//cout<<"Vertex Index: "<<boneMorph->boneIndex<<endl;
 					

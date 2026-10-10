@@ -95,6 +95,7 @@ namespace ClosedMMDFormat
 		glm::vec3 normal;					//!< \if ENGLISH \brief Vertex Normal \endif
 											//!< \if JAPANESE \brief 頂点のノーマル \endif
 		glm::vec2 UV; 						//!< \if ENGLISH \brief Texture UV Coordinates \endif
+		glm::vec4 extraUV[4];				//!< Additional UVs (PMX header "extra UV count", 0-4); unused entries are 0
 											//!< \if JAPANESE \brief テクスチャのUV座標 \endif
 		
 		uint8_t weight_transform_formula;	//!< \if ENGLISH \brief Weight Transformation Formula \endif

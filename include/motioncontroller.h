@@ -88,7 +88,15 @@ class VMDMotionController
 	std::vector<MaterialState> materialStates;
 	
 	//! Effective weight of every morph this frame (VMD value + group morph contributions)
-	std::vector<float> morphWeights;				//!< \if ENGLISH \brief A pointer to the array of vertices that the model is made of. \endif
+	std::vector<float> morphWeights;
+	
+	//! Additional UVs after UV morphs: extraUVs[vertex*4 + k] (only filled when the model has extra UVs).
+	//! The viewer does not render them; they are provided for library users.
+	std::vector<glm::vec4> extraUVs;
+	
+	//! Per-bone offset from bone morphs this frame (applied on top of the VMD pose)
+	std::vector<glm::vec3> boneMorphPos;
+	std::vector<glm::quat> boneMorphRot;				//!< \if ENGLISH \brief A pointer to the array of vertices that the model is made of. \endif
 										//!< \if JAPANESE \brief モデルが出来ている頂点の配列へのポインター。 \endif
 	
 	
@@ -99,6 +107,8 @@ class VMDMotionController
 	void updateIK();
 	void updateInheritance(); //PMX rotation/translation inheritance ("付与")
 	void updateMaterialMorphs();
+	glm::vec3 animatedPosition(int boneIndex) const;
+	glm::quat animatedRotation(int boneIndex) const;
 	void applyInheritance(int boneIndex, std::vector<char> &state);
 	void solveIK(ClosedMMDFormat::PMXBone *joint, int effector, glm::vec3 targetPos, int numIteration, int numBones, int numMaxBones);
 	

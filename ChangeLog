@@ -27,6 +27,11 @@ October 10, 2026 (merge of weimingtom/MMP v0.2.1):
  morphs of a pose VMD were lost)
 -Removed an IK-marker debug branch in the fragment shader that coloured
  vertices with a 0 UV component pink
+-Implemented bone morphs (translation/rotation added on top of the VMD
+ pose, before IK and inheritance)
+-Additional UVs are loaded (models with extra UVs used to abort) and
+ extra UV morphs are applied to VMDMotionController::extraUVs (not
+ rendered by the viewer)
 
 October 10, 2026:
 -Ported from GLFW 2 to GLFW 3 (GLFW 2 is no longer shipped by distributions)
