@@ -45,6 +45,10 @@ October 10, 2026 (merge of weimingtom/MMP v0.2.1):
 -Back-face culling per material (draw-both-sides flag), correct front face
  winding (clockwise); outlines are drawn after the model, depth tested,
  with a constant on-screen width of edgeSize pixels
+-Physics starts from the first frame's pose: rigid bodies are moved to
+ their bones' pose (velocities cleared) and allowed to settle before
+ playback.  Motions whose first frame is far from the bind pose used to
+ fling skirts/hair away at the start
 
 October 10, 2026:
 -Ported from GLFW 2 to GLFW 3 (GLFW 2 is no longer shipped by distributions)

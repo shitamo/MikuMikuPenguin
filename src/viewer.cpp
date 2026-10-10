@@ -121,6 +121,10 @@ Viewer::Viewer(string modelPath, string motionPath,string musicPath)
 	motionController->updateVertexMorphs();
 	motionController->updateBoneAnimation();
 	
+	//Start the physics from the first frame's pose instead of the bind pose
+	mmdPhysics->resetToCurrentPose();
+	motionController->updateBoneMatrix();
+	
 	//Initialize timer variables
 	startTime = glfwGetTime();
 	ticks=0;

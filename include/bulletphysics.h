@@ -81,6 +81,8 @@ class BulletPhysics
 	//@}
 		
 	void MoveRigidBody(btRigidBody* body, const glm::mat4* world);
+	//! Teleport a rigid body (kinematic or dynamic) and clear its velocities.
+	void ResetRigidBody(btRigidBody* body, const glm::mat4* world);
 	
 	// 拘束条件追加
 	void AddPointToPointConstraint(btRigidBody* body, const glm::vec3& pivot);

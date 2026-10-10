@@ -1,3 +1,10 @@
+mikumikupenguin (0.2.1+20261011.1) unstable; urgency=medium
+
+  * Start the physics simulation from the first frame's pose; skirts and
+    hair were flung away when the motion starts far from the bind pose.
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 01:10:00 +0900
+
 mikumikupenguin (0.2.1+20261011) unstable; urgency=medium
 
   * MMD-style material shading (toon ramp, sphere maps, specular, MMD

@@ -53,6 +53,13 @@ class MMDPhysics
 	*/
 	void updateBones(bool physicsEnabled);
 	
+	/*! Move every rigid body to the pose of its bone (using the current bone
+	 *  transforms) and clear velocities.  Call this after posing the model for
+	 *  the first frame (or after a jump in the motion): otherwise the physics
+	 *  bodies start in the bind pose and get yanked across the scene, which
+	 *  makes hair/skirts explode. */
+	void resetToCurrentPose(int settleSteps = 30);
+	
 	
 	private:
 	glm::mat4 createRigidMatrix(const glm::vec3 &pos, const glm::vec3 &rot);

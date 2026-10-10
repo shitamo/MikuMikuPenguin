@@ -267,3 +267,20 @@ void MMDPhysics::updateBones(bool physicsEnabled)
 		}
 	}
 }
+
+void MMDPhysics::resetToCurrentPose(int settleSteps)
+{
+	for (unsigned int i_rb = 0; i_rb < pmxInfo.rigidBodies.size() && i_rb < rigidBodies.size(); ++i_rb)
+	{
+		int i_bone = pmxInfo.rigidBodies[i_rb]->relatedBoneIndex;
+		if (i_bone < 0 || i_bone >= pmxInfo.bone_continuing_datasets) continue;
+		const glm::mat4 rigidMat = pmxInfo.bones[i_bone]->calculateGlobalMatrix()*motionController->invBindPose[i_bone]*pmxInfo.rigidBodies[i_rb]->Init;
+		bulletPhysics->ResetRigidBody(rigidBodies[i_rb], &rigidMat);
+	}
+	
+	//let the dynamic bodies settle (gravity, joints) in the current pose
+	for (int i = 0; i < settleSteps; ++i)
+	{
+		updateBones(true);
+	}
+}

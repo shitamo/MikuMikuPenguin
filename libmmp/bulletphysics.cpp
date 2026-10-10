@@ -137,6 +137,20 @@ void BulletPhysics::MoveRigidBody(btRigidBody* body, const glm::mat4* world)
 	body->getMotionState()->setWorldTransform(trans);
 }
 
+void BulletPhysics::ResetRigidBody(btRigidBody* body, const glm::mat4* world)
+{
+	btTransform trans = ConvertMatrixGLToBT(*world);
+	body->setWorldTransform(trans);
+	body->setInterpolationWorldTransform(trans);
+	if(body->getMotionState()) body->getMotionState()->setWorldTransform(trans);
+	body->setLinearVelocity(btVector3(0, 0, 0));
+	body->setAngularVelocity(btVector3(0, 0, 0));
+	body->setInterpolationLinearVelocity(btVector3(0, 0, 0));
+	body->setInterpolationAngularVelocity(btVector3(0, 0, 0));
+	body->clearForces();
+	body->activate(true);
+}
+
 void BulletPhysics::StepSimulation()
 {
 	dynamicsWorld->stepSimulation(1.0f/60.0f, 10, 1.0f/120.0f);
