@@ -372,6 +372,11 @@ PMXInfo &readPMX(string foldername,string filename)
 	
 	//***Pull Texture Info***	
 	miku.read((char*)&pmxInfo.texture_continuing_datasets,4);
+	if(!miku || pmxInfo.texture_continuing_datasets<0 || pmxInfo.texture_continuing_datasets>1000000)
+	{
+		cerr<<"ERROR: corrupt PMX file (texture count)"<<endl;
+		exit(EXIT_FAILURE);
+	}
 	pmxInfo.texturePaths=new string[pmxInfo.texture_continuing_datasets+11];
 	
 	cout<<"Loading textures...";

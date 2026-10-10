@@ -37,6 +37,12 @@ VMDInfo &readVMD(string filename)
 	
 	//***Extract Bone Info***
 	miku.read((char*)&vmdInfo.boneCount,4);
+	if(!miku) vmdInfo.boneCount=0; //older/truncated VMD files may end early
+	if(vmdInfo.boneCount<0 || vmdInfo.boneCount>10000000)
+	{
+		cerr<<"ERROR: corrupt VMD file (boneCount="<<vmdInfo.boneCount<<")"<<endl;
+		exit(EXIT_FAILURE);
+	}
 	vmdInfo.boneFrames=new BoneFrame[vmdInfo.boneCount];
 	
 	//cout<<"Bone Count: "<<vmdInfo.boneCount<<endl;
@@ -118,6 +124,12 @@ VMDInfo &readVMD(string filename)
 	
 	//***Extract Morph Info***
 	miku.read((char*)&vmdInfo.morphCount,4);
+	if(!miku) vmdInfo.morphCount=0; //older/truncated VMD files may end early
+	if(vmdInfo.morphCount<0 || vmdInfo.morphCount>10000000)
+	{
+		cerr<<"ERROR: corrupt VMD file (morphCount="<<vmdInfo.morphCount<<")"<<endl;
+		exit(EXIT_FAILURE);
+	}
 	vmdInfo.morphFrames=new MorphFrame[vmdInfo.morphCount];
 	
 	//cout<<"Morph Count: "<<vmdInfo.morphCount<<endl;
@@ -142,6 +154,12 @@ VMDInfo &readVMD(string filename)
 	
 	//***Extract Camera Info***
 	miku.read((char*)&vmdInfo.cameraCount,4);
+	if(!miku) vmdInfo.cameraCount=0; //older/truncated VMD files may end early
+	if(vmdInfo.cameraCount<0 || vmdInfo.cameraCount>10000000)
+	{
+		cerr<<"ERROR: corrupt VMD file (cameraCount="<<vmdInfo.cameraCount<<")"<<endl;
+		exit(EXIT_FAILURE);
+	}
 	vmdInfo.cameraFrames=new CameraFrame[vmdInfo.cameraCount];
 	//cout<<"Camera Count: "<<vmdInfo.cameraCount<<endl;
 	
@@ -168,12 +186,24 @@ VMDInfo &readVMD(string filename)
 	
 	//***Extract Light Info***
 	miku.read((char*)&vmdInfo.lightCount,4);
+	if(!miku) vmdInfo.lightCount=0; //older/truncated VMD files may end early
+	if(vmdInfo.lightCount<0 || vmdInfo.lightCount>10000000)
+	{
+		cerr<<"ERROR: corrupt VMD file (lightCount="<<vmdInfo.lightCount<<")"<<endl;
+		exit(EXIT_FAILURE);
+	}
 	vmdInfo.lightFrames=new LightFrame[vmdInfo.lightCount];
 	//cout<<"Light Count: "<<vmdInfo.lightCount<<endl;
 	
 	
 	//***Extract Self Shadow Info***
 	miku.read((char*)&vmdInfo.selfShadowCount,4);
+	if(!miku) vmdInfo.selfShadowCount=0; //older/truncated VMD files may end early
+	if(vmdInfo.selfShadowCount<0 || vmdInfo.selfShadowCount>10000000)
+	{
+		cerr<<"ERROR: corrupt VMD file (selfShadowCount="<<vmdInfo.selfShadowCount<<")"<<endl;
+		exit(EXIT_FAILURE);
+	}
 	vmdInfo.selfShadowFrames=new SelfShadowFrame[vmdInfo.selfShadowCount];
 	//cout<<"SelfShadow Count: "<<vmdInfo.selfShadowCount<<endl;
 	
