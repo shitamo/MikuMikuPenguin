@@ -1,4 +1,4 @@
-#version 410 core
+#version 330 core
 
 uniform sampler2D textureSampler;
 uniform sampler2D sphereSampler;
@@ -33,7 +33,7 @@ vec4 getSphereColor()
 	if(sphereMode>0) //if sphere mapping is used
 	{
 		vec2 sphereCoord = 0.5 * (1.0 + vec2(1.0, -1.0) * normalize(normal).xy);
-		sphereColor=texture2D(sphereSampler, sphereCoord);
+		sphereColor=texture(sphereSampler, sphereCoord);
 	}
 	
 	return sphereColor;
@@ -85,7 +85,7 @@ void main()
 		
 		float dotNL = max(0.0, dot(normalize(lightDirection), normalize(normal)));
         vec2 toonCoord = vec2(0.0, 0.5 * (1.0 - dotNL));
-        vec3 toon = texture2D(toonSampler, toonCoord).rgb;
+        vec3 toon = texture(toonSampler, toonCoord).rgb;
 		
 		vec3 colorRGB=min((textureColor*scatteredLight) + reflectedLight,vec3(1.0));
 		color=vec4(colorRGB,texture(textureSampler, UV).a);

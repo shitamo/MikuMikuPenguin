@@ -111,7 +111,7 @@ glm::fquat Slerp(glm::quat &v0, glm::quat &v1, float alpha)
 	if(dot > DOT_THRESHOLD)
 		return Lerp(v0, v1, alpha);
 
-	glm::clamp(dot, -1.0f, 1.0f);
+	dot = glm::clamp(dot, -1.0f, 1.0f);
 	float theta_0 = acosf(dot);
 	float theta = theta_0*alpha;
     
@@ -142,7 +142,7 @@ glm::vec4 Slerp(glm::vec4 &v0, glm::vec4 &v1, float alpha)
 	if(dot > DOT_THRESHOLD)
 		return Lerp(v0, v1, alpha);
 
-	glm::clamp(dot, -1.0f, 1.0f);
+	dot = glm::clamp(dot, -1.0f, 1.0f);
 	float theta_0 = acosf(dot);
 	float theta = theta_0*alpha;
     
@@ -155,7 +155,7 @@ glm::vec4 Slerp(glm::vec4 &v0, glm::vec4 &v1, float alpha)
 float Lerp(const float &start, const float &end, float alpha)
 {
     float interp = glm::mix(start, end, alpha);
-    interp = glm::normalize(interp);
+    interp = mmp::scalarNormalize(interp); //GLM 0.9.4 scalar normalize semantics
     return interp;
 }
 
@@ -178,7 +178,7 @@ float Slerp(float &v0, float &v1, float alpha)
 	float theta = theta_0*alpha;
     
 	float v2 = v1 + -v0*dot;
-	v2 = glm::normalize(v2);
+	v2 = mmp::scalarNormalize(v2);
     
     return v0*cos(theta) + v2*sin(theta);
 }

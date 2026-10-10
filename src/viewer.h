@@ -1,14 +1,8 @@
 #ifndef VIEWER_H
 #define VIEWER_H
 
-#include <GL/glew.h>
-#define GLFW_INCLUDE_GLU
-#include <GL/glfw.h>
-
-#include <glm/gtc/matrix_transform.hpp> 
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/transform.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include "mmp_gl.h"
+#include "mmp_glm.h"
 
 #include <vector>
 #include <string>
@@ -54,12 +48,16 @@ class Viewer
 	void render();
 	
 	void setCamera(GLuint MVPLoc);
+	bool keyPressed(int key);
 	void holdModelInBindPose();
 	
 	void drawModel(bool drawEdges);
 	void drawIKMarkers();
 	
 	
+	GLFWwindow *window;
+	int framebufferWidth, framebufferHeight;
+
 	GLuint VAOs[NumVAOs];
 	GLuint Buffers[NumBuffers];
 	GLuint uniformVars[NumUniforms];
@@ -74,6 +72,8 @@ class Viewer
 	MMDPhysics *mmdPhysics;
 
 	std::vector<GLuint> textures;
+	GLuint whiteTexture; //bound when a material has no texture
+	GLuint textureOrWhite(int index);
 	
 	GLuint shaderProgram;
 	

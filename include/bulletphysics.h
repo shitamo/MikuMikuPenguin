@@ -7,9 +7,7 @@
 #include <string>
 #include <fstream>
 
-#include <glm/gtc/matrix_transform.hpp> 
-#include <glm/gtx/transform.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include "mmp_glm.h"
 
 #include "bulletdebugdrawer.h"
 

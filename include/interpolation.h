@@ -1,13 +1,7 @@
 #ifndef INTERPOLATION_H
 #define INTERPOLATION_H
 
-#include <glm/gtc/matrix_transform.hpp> 
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/transform.hpp>
-#include <glm/gtx/quaternion.hpp>
-#include <glm/gtx/compatibility.hpp>
-#include <glm/gtx/norm.hpp>
-#include <glm/gtx/euler_angles.hpp>
+#include "mmp_glm.h"
 
 float bezier(float X, float x1,float y1, float x2,float y2);
 

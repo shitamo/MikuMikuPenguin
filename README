@@ -23,11 +23,12 @@ shaders　-　PMXViewerのシェーダーがここに入ってます。
 src　-　PMXViewerのソースコード（.cpp、.h）がここに入ってます。
 data　-　必要なテクスチャ等が入ってます。
 
-LibMikuMikuPenguinにはlibglfw, libglew,libglm,libBulletが必要です。
+LibMikuMikuPenguinにはlibglfw3, libglew,libglm,libBulletが必要です。（2026年版より GLFW 3 を使用）
 PMXViewerにはlibmmp、libSOILが必要です。VMDと一緒に音楽を再生したい場合は、SDL2、SDL2_mixerも必要です。（なくてもコンパイル出来ます）
 
 このソースコードはautotoolsを利用していますので、コンパイルやインストールは簡単です：
 コンパイルするにはターミナルで：
+./autogen.sh   （git から取得した場合のみ）
 ./configure
 make
 をすれば大丈夫です。
@@ -61,11 +62,12 @@ shaders - PMXViewer's shaders are in this folder.
 src - PMXViewer's source code (.cpp, .h) are in this folder.
 data - Required textures and other data files are in this folder.
 
-For LibMikuMikuPenguin, libglfw, libglew, libglm, and libBullet are needed.
+For LibMikuMikuPenguin, libglfw3, libglew, libglm, and libBullet are needed (GLFW 3 since the 2026 update).
 For PMXViewer, libmmp and libSOIL are needed. If you want to play music along with the VMD motion, you'll need SDL2 and SDL2_mixer. (You can compile the code without music playback support)
 
 This source code uses autotools, so compiling the code is very simple:
 To compile, run the following commands in a terminal:
+./autogen.sh   (only when building from git)
 ./configure
 make
 To install libmmp and PMXViewer on your system, run:

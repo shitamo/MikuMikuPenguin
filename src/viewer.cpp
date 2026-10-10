@@ -4,7 +4,13 @@
 #include <fstream>
 #include <sstream>
 
-#include "SOIL/SOIL.h"
+#include <SOIL/SOIL.h>
+
+#include <cstdio>
+#include <cstring>
+#include <strings.h>
+#include <unistd.h>
+#include <dirent.h>
 //#include <FreeImage.h>
 
 #include "texthandle.h"
@@ -121,12 +127,12 @@ Viewer::Viewer(string modelPath, string motionPath,string musicPath)
 void Viewer::handleLogic()
 {
 	bool doPhysics=true;
-	if(glfwGetKey('Q')==GLFW_PRESS)
+	if(keyPressed(GLFW_KEY_Q))
 	{
 		doPhysics=false;
 	}
 	
-	//if(glfwGetKey('A')==GLFW_RELEASE)
+	//if(!keyPressed(GLFW_KEY_A))
 	{
 		motionController->advanceTime();
 		
@@ -146,28 +152,28 @@ void Viewer::handleLogic()
 
 void Viewer::render()
 {
-	if(glfwGetKey('A')==GLFW_RELEASE)
+	if(!keyPressed(GLFW_KEY_A))
 	{
 		drawModel(true); //draw model edges
 		drawModel(false); //draw model
 	}
 	
-	if(glfwGetKey('S')==GLFW_PRESS)
+	if(keyPressed(GLFW_KEY_S))
 	{
 		bulletPhysics->setDebugMode(btIDebugDraw::DBG_DrawWireframe);
 		bulletPhysics->DebugDrawWorld();
 	}
-	else if(glfwGetKey('D')==GLFW_PRESS)
+	else if(keyPressed(GLFW_KEY_D))
 	{
 		bulletPhysics->setDebugMode(btIDebugDraw::DBG_DrawAabb);
 		bulletPhysics->DebugDrawWorld();
 	}
-	else if(glfwGetKey('F')==GLFW_PRESS)
+	else if(keyPressed(GLFW_KEY_F))
 	{
 		bulletPhysics->setDebugMode(btIDebugDraw::DBG_DrawConstraints);
 		bulletPhysics->DebugDrawWorld();
 	}
-	else if(glfwGetKey('G')==GLFW_PRESS)
+	else if(keyPressed(GLFW_KEY_G))
 	{
 		bulletPhysics->setDebugMode(btIDebugDraw::DBG_DrawConstraintLimits);
 		bulletPhysics->DebugDrawWorld();
@@ -186,8 +192,10 @@ void Viewer::render()
 
 void Viewer::run()
 {
-	while(glfwGetKey( GLFW_KEY_ESC ) != GLFW_PRESS && glfwGetWindowParam( GLFW_OPENED ))
+	while(!keyPressed(GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(window))
 	{
+		glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+		glViewport(0, 0, framebufferWidth, framebufferHeight);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		startTime = glfwGetTime();
 		
@@ -195,13 +203,14 @@ void Viewer::run()
 		handleLogic();
 		render();
 		
-		glfwSwapBuffers();
+		glfwSwapBuffers(window);
 	}
 }
 
 void Viewer::setCamera(GLuint MVPLoc)
 {
-	glm::mat4 Projection = glm::perspective(45.0f, 16.0f/9.0f, 0.1f, 100.0f);
+	float aspect = (framebufferWidth>0 && framebufferHeight>0) ? (float)framebufferWidth/(float)framebufferHeight : 16.0f/9.0f;
+	glm::mat4 Projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
 	// Camera matrix
 	glm::mat4 View       = glm::lookAt(
 		glm::vec3(cameraPosition.x,cameraPosition.y,-cameraPosition.z), // Camera is at (4,3,3), in World Space
@@ -210,7 +219,7 @@ void Viewer::setCamera(GLuint MVPLoc)
 	);
 	//View= glm::rotate(0.0f,0.0f,0.0f,1.0f)* View;
 	// Model matrix : an identity matrix (model will be at the origin)
-	glm::mat4 Model = glm::translate(modelTranslate.x, modelTranslate.y, modelTranslate.z);
+	glm::mat4 Model = glm::translate(modelTranslate);
 	// Our ModelViewProjection : multiplication of our 3 matrices
 	glm::mat4 MVP = Projection * View * Model;
 	
@@ -256,32 +265,29 @@ void Viewer::drawModel(bool drawEdges)
 	{
 		
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D,textures[pmxInfo->materials[m]->textureIndex]);
-		glUniform1iARB(uniformVars[uTextureSampler], 0);
+		glBindTexture(GL_TEXTURE_2D,textureOrWhite(pmxInfo->materials[m]->textureIndex));
+		glUniform1i(uniformVars[uTextureSampler], 0);
 		
 		if((int)pmxInfo->materials[m]->sphereMode>0)
 		{
 			glActiveTexture(GL_TEXTURE1);
-			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D,textures[pmxInfo->materials[m]->sphereIndex]);
-			glUniform1iARB(uniformVars[uSphereSampler], 1);
+			glBindTexture(GL_TEXTURE_2D,textureOrWhite(pmxInfo->materials[m]->sphereIndex));
+			glUniform1i(uniformVars[uSphereSampler], 1);
 		}
 		
 		if((int)pmxInfo->materials[m]->shareToon==0)
 		{
 			glActiveTexture(GL_TEXTURE2);
-			glEnable(GL_TEXTURE_2D);
 			
-			glBindTexture(GL_TEXTURE_2D,textures[pmxInfo->materials[m]->toonTextureIndex]);
-			glUniform1iARB(uniformVars[uToonSampler], 2);
+			glBindTexture(GL_TEXTURE_2D,textureOrWhite(pmxInfo->materials[m]->toonTextureIndex));
+			glUniform1i(uniformVars[uToonSampler], 2);
 		}
 		else if((int)pmxInfo->materials[m]->shareToon==1)
 		{
 			glActiveTexture(GL_TEXTURE2);
-			glEnable(GL_TEXTURE_2D);
 			
-			glBindTexture(GL_TEXTURE_2D,textures[textures.size()-11+pmxInfo->materials[m]->shareToonTexture]);
-			glUniform1iARB(uniformVars[uToonSampler], 2);
+			glBindTexture(GL_TEXTURE_2D,textureOrWhite((int)textures.size()-10+(int)pmxInfo->materials[m]->shareToonTexture));
+			glUniform1i(uniformVars[uToonSampler], 2);
 		}
 		
 		
@@ -289,14 +295,14 @@ void Viewer::drawModel(bool drawEdges)
 		glUniform4fv(uniformVars[uDiffuse],1,(GLfloat*)&pmxInfo->materials[m]->diffuse);
 		glUniform3fv(uniformVars[uSpecular],1,(GLfloat*)&pmxInfo->materials[m]->specular);
 		
-		glUniform1f(uniformVars[uShininess],glm::normalize(pmxInfo->materials[m]->shininess));
+		glUniform1f(uniformVars[uShininess],mmp::scalarNormalize(pmxInfo->materials[m]->shininess));
 		glUniform3f(uniformVars[uHalfVector],halfVector.x,halfVector.y,halfVector.z);
 		glUniform3f(uniformVars[uLightDirection],lightDirection.x,lightDirection.y,lightDirection.z);
 		
 		glUniform4fv(uniformVars[uEdgeColor],1,(GLfloat*)&pmxInfo->materials[m]->edgeColor);
-		glUniform1f(uniformVars[uEdgeSize],glm::normalize(pmxInfo->materials[m]->edgeSize));
+		glUniform1f(uniformVars[uEdgeSize],mmp::scalarNormalize(pmxInfo->materials[m]->edgeSize));
 		
-		glUniform1f(uniformVars[uSphereMode],glm::normalize(pmxInfo->materials[m]->sphereMode));
+		glUniform1f(uniformVars[uSphereMode],mmp::scalarNormalize(pmxInfo->materials[m]->sphereMode));
         
 		glDrawElements(GL_TRIANGLES, (pmxInfo->materials[m]->hasFaceNum), GL_UNSIGNED_INT, BUFFER_OFFSET(sizeof(GLuint)*faceCount));
 		faceCount+=pmxInfo->materials[m]->hasFaceNum;
@@ -470,258 +476,195 @@ void Viewer::initBuffers()
 	glEnableVertexAttribArray(vWeightFormula);
 }
 
+//Windows-made models often reference textures with different letter case
+//than the files on disk.  Resolve each path component case-insensitively.
+static string resolvePathCaseInsensitive(const string &path)
+{
+	if(access(path.c_str(), R_OK)==0) return path;
+	
+	string result;
+	size_t pos=0;
+	if(!path.empty() && path[0]=='/') { result="/"; pos=1; }
+	
+	while(pos<=path.size())
+	{
+		size_t next=path.find('/', pos);
+		if(next==string::npos) next=path.size();
+		string component=path.substr(pos, next-pos);
+		pos=next+1;
+		if(component.empty()) continue;
+		
+		string dirName=result.empty() ? "." : result;
+		string candidate=(result.empty() || result=="/") ? result+component : result+"/"+component;
+		if(access(candidate.c_str(), F_OK)!=0)
+		{
+			DIR *dir=opendir(dirName.c_str());
+			if(!dir) return path;
+			struct dirent *entry;
+			bool found=false;
+			while((entry=readdir(dir))!=NULL)
+			{
+				if(strcasecmp(entry->d_name, component.c_str())==0)
+				{
+					candidate=(result.empty() || result=="/") ? result+entry->d_name : result+"/"+entry->d_name;
+					found=true;
+					break;
+				}
+			}
+			closedir(dir);
+			if(!found) return path;
+		}
+		result=candidate;
+	}
+	return result.empty() ? path : result;
+}
+
+//Load one image file into a new GL texture.  Falls back to a 1x1 white
+//texture when the file is missing or cannot be decoded.
+static GLuint loadTextureFile(const string &requestedPath, bool rgba, bool verbose=true)
+{
+	string loc=resolvePathCaseInsensitive(requestedPath);
+	if(verbose) cout<<"Loading "<<loc<<"...";
+	
+	GLuint texture=0;
+	int width=0, height=0, channels=0;
+	unsigned char *image=SOIL_load_image(loc.c_str(), &width, &height, &channels, rgba ? SOIL_LOAD_RGBA : SOIL_LOAD_RGB);
+	
+	glActiveTexture(GL_TEXTURE0);
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	
+	if(image && width>0 && height>0)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, rgba ? GL_RGBA : GL_RGB, width, height, 0, rgba ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE, image);
+		if(verbose) cout<<"done"<<endl;
+	}
+	else
+	{
+		const unsigned char white[4]={255,255,255,255};
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
+		if(verbose) cout<<"failed"<<endl;
+		cerr<<"WARNING: texture could not be loaded: "<<requestedPath<<" ("<<SOIL_last_result()<<")"<<endl;
+	}
+	if(image) SOIL_free_image_data(image);
+	
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+	
+	return texture;
+}
+
+static bool hasExtension(const string &path, const char *ext)
+{
+	size_t n=strlen(ext);
+	return path.size()>=n && strcasecmp(path.c_str()+path.size()-n, ext)==0;
+}
+
 void Viewer::loadTextures()
 {
-	//Thought about replacing SOIL with FreeImage, but for now sticking with SOIL. Don't fix what isn't broken.
-	//Warning: Commented-out FreeImage code below is buggy (DOES NOT WORK)
-	
-	//FreeImage_Initialise();	
+	//1x1 white texture used for materials without a (valid) texture
+	{
+		const unsigned char white[4]={255,255,255,255};
+		glActiveTexture(GL_TEXTURE0);
+		glGenTextures(1, &whiteTexture);
+		glBindTexture(GL_TEXTURE_2D, whiteTexture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
 	
 	for(int i=0; i<pmxInfo->texture_continuing_datasets; ++i)
 	{
-		cout<<"Loading "<<pmxInfo->texturePaths[i]<<"...";
-		if(pmxInfo->texturePaths[i].substr(pmxInfo->texturePaths[i].size()-3)=="png" || pmxInfo->texturePaths[i].substr(pmxInfo->texturePaths[i].size()-3)=="spa")
-		{
-			GLuint texture;
-			int width, height;
-			unsigned char* image;
-			string loc=pmxInfo->texturePaths[i];
-			
-			ifstream test(loc);
-			if(!test.is_open())
-			{
-				cerr<<"Texture file could not be found: "<<loc<<endl;
-				//exit(EXIT_FAILURE);
-			}
-			test.close();
-			
-			glActiveTexture( GL_TEXTURE0 );
-			glGenTextures( 1, &texture );
-			glBindTexture( GL_TEXTURE_2D, texture );
-				image = SOIL_load_image( loc.c_str(), &width, &height, 0, SOIL_LOAD_RGBA );
-			glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image );
-			SOIL_free_image_data( image );
-
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-			
-			if(texture==0)
-			{
-				cerr<<"Texture failed to load: "<<pmxInfo->texturePaths[i]<<endl;
-				printf( "SOIL loading error: '%s'\n", SOIL_last_result() );
-				exit(EXIT_FAILURE);
-			}
-			
-			cout<<"done"<<endl;
-			
-			textures.push_back(texture);
-		}
-		else if(pmxInfo->texturePaths[i].substr(pmxInfo->texturePaths[i].size()-3)=="tga")
-		{
-			//cerr<<"WARNING: TGA files only mildly tested"<<endl;
-			
-			/*static GLuint texture = 0;
-	
-			FIBITMAP *bitmap = FreeImage_Load( FreeImage_GetFileType(pmxInfo->texturePaths[i].c_str(), 0),pmxInfo->texturePaths[i].c_str() );
-			FIBITMAP *pImage = FreeImage_ConvertTo24Bits(bitmap);
-			
-			int nWidth = FreeImage_GetWidth(pImage);
-			int nHeight = FreeImage_GetHeight(pImage);
-			
-			glActiveTexture( GL_TEXTURE0 );
-			glGenTextures(1, &texture);
-
-			glBindTexture(GL_TEXTURE_2D, texture);
-			
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, nWidth, nHeight,
-			0, GL_BGR, GL_UNSIGNED_BYTE, (void*)FreeImage_GetBits(pImage));
-			
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-			
-			if(texture==0)
-			{
-				cerr<<"Texture failed to load: "<<pmxInfo->texturePaths[i]<<endl;
-				exit(EXIT_FAILURE);
-			}
-
-			FreeImage_Unload(bitmap);
-			
-			textures.push_back(texture);
-			
-			cout<<"done"<<endl;*/
-			
-			GLuint texture;
-			int width, height, channels;
-			unsigned char* image;
-			string loc=pmxInfo->texturePaths[i];
-			
-			ifstream test(loc);
-			if(!test.is_open())
-			{
-				cerr<<"Texture file could not be found: "<<loc<<endl;
-				//exit(EXIT_FAILURE);
-			}
-			test.close();
-			
-			glActiveTexture( GL_TEXTURE0 );
-			glGenTextures( 1, &texture );
-			glBindTexture( GL_TEXTURE_2D, texture );
-				image = SOIL_load_image( loc.c_str(), &width, &height, &channels, SOIL_LOAD_RGBA );
-			
-			glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image );
-			SOIL_free_image_data( image );
-
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-			
-			if(texture==0)
-			{
-				cerr<<"Texture failed to load: "<<pmxInfo->texturePaths[i]<<endl;
-				printf( "SOIL loading error: '%s'\n", SOIL_last_result() );
-				exit(EXIT_FAILURE);
-			}
-			
-			cout<<"done"<<endl;
-			
-			textures.push_back(texture);
-		}
-		else
-		{
-			GLuint texture;
-			int width, height;
-			unsigned char* image;
-			string loc=pmxInfo->texturePaths[i];
-			
-			ifstream test(loc);
-			if(!test.is_open())
-			{
-				cerr<<"Texture file could not be found: "<<loc<<endl;
-				//exit(EXIT_FAILURE);
-			}
-			test.close();
-			
-			glActiveTexture(GL_TEXTURE0);
-			glGenTextures( 1, &texture );
-			glBindTexture( GL_TEXTURE_2D, texture );
-			image = SOIL_load_image( loc.c_str(), &width, &height, 0, SOIL_LOAD_RGB );
-			glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image );
-			SOIL_free_image_data( image );
-			
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-			//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
- 
-			if(texture == 0)
-			{
-				cerr<<"Texture failed to load: "<<pmxInfo->texturePaths[i]<<endl;
-				printf( "SOIL loading error: '%s'\n", SOIL_last_result() );
-				exit(EXIT_FAILURE);
-			}
-			
-			textures.push_back(texture);
-			
-			cout<<"done"<<endl;
-		}
+		const string &path=pmxInfo->texturePaths[i];
+		bool rgba = hasExtension(path,"png") || hasExtension(path,"spa") || hasExtension(path,"tga");
+		textures.push_back(loadTextureFile(path, rgba));
 	}
 	
+	//Shared toon textures toon01.bmp - toon10.bmp (always the last 10 entries)
 	for(int i=1; i<=10; ++i)
 	{
-		//cout<<"Loading toon"<<i<<".bmp...";
+		char name[16];
+		snprintf(name, sizeof(name), "toon%02d.bmp", i);
 		
-		GLuint texture;
-		int width, height, channels;
-		unsigned char* image;
-		stringstream loc;
-		if(i!=10) loc<<"data/share/toon0"<<i<<".bmp";
-		else loc<<"data/share/toon10.bmp";
-		
-		ifstream test(loc.str());
-		if(!test.is_open())
+		string loc=string("data/share/")+name;
+		if(access(loc.c_str(), R_OK)!=0)
 		{
-			//cerr<<"Texture file could not be found: "<<loc.str()<<endl;
-			//exit(EXIT_FAILURE);
-			
-			loc.str(std::string()); //clear ss
-			if(i!=10) loc<<DATA_PATH<<"/textures/toon0"<<i<<".bmp";
-			else loc<<DATA_PATH<<"/textures/toon10.bmp";
-			
-			ifstream test2(loc.str());
-			if(!test2.is_open())
-			{
-				cerr<<"Texture file could not be found: "<<loc.str()<<endl;
-			}
-			
+			loc=string(DATA_PATH)+"/textures/"+name;
 		}
-		test.close();
-		
-		glActiveTexture( GL_TEXTURE0 );
-		glGenTextures( 1, &texture );
-		glBindTexture( GL_TEXTURE_2D, texture );
-			image = SOIL_load_image( loc.str().c_str(), &width, &height, &channels, SOIL_LOAD_RGBA );
-		
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image );
-		SOIL_free_image_data( image );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-		
-		if(texture==0)
-		{
-			cerr<<"Toon Texture failed to load: "<<i<<endl;
-			printf( "SOIL loading error: '%s'\n", SOIL_last_result() );
-			exit(EXIT_FAILURE);
-		}
-		
-		//cout<<"done"<<endl;
-		
-		textures.push_back(texture);
+		textures.push_back(loadTextureFile(loc, true, false));
 	}
-	
-	
-	//FreeImage_DeInitialise();
 }
 
 
+static void glfwErrorCallback(int error, const char *description)
+{
+	cerr<<"GLFW error "<<error<<": "<<description<<endl;
+}
+
 void Viewer::initGLFW()
 {
+	glfwSetErrorCallback(glfwErrorCallback);
 	if (!glfwInit()) exit(EXIT_FAILURE);
 	
-	glfwOpenWindowHint(GLFW_FSAA_SAMPLES, 4); //4x antialiasing
-	glfwOpenWindowHint(GLFW_OPENGL_VERSION_MAJOR, 4); //OpenGL version
-	glfwOpenWindowHint(GLFW_OPENGL_VERSION_MINOR, 1);
-	glfwOpenWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //Don't want old OpenGL
- 
+	glfwWindowHint(GLFW_SAMPLES, 4); //4x antialiasing
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); //OpenGL 3.3 core is enough for the shaders
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //Don't want old OpenGL
+	glfwWindowHint(GLFW_DEPTH_BITS, 32);
+	
 	//Open a window and create its OpenGL context
-	if( !glfwOpenWindow( 1920, 1080, 0,0,0,0, 32,0, GLFW_WINDOW ) )
+	window = glfwCreateWindow(1280, 720, "PMX Viewer", NULL, NULL);
+	if(!window)
 	{
-		fprintf( stderr, "Failed to open GLFW window\n" );
+		//Some drivers refuse a 32-bit depth buffer; retry with the default
+		glfwWindowHint(GLFW_DEPTH_BITS, 24);
+		window = glfwCreateWindow(1280, 720, "PMX Viewer", NULL, NULL);
+	}
+	if(!window)
+	{
+		fprintf( stderr, "Failed to open GLFW window (OpenGL 3.3 core profile required)\n" );
 		glfwTerminate();
 		exit(EXIT_FAILURE);
 	}
+	glfwMakeContextCurrent(window);
+	glfwSwapInterval(1);
+	glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
 
 	// Initialize GLEW
-	glewExperimental=true; //Needed in core profile
-	if(glewInit() != GLEW_OK)
+	glewExperimental=GL_TRUE; //Needed in core profile
+	GLenum glewStatus=glewInit();
+#ifdef GLEW_ERROR_NO_GLX_DISPLAY
+	//GLEW built for GLX reports this under Wayland/EGL even though the
+	//function pointers were loaded successfully.
+	if(glewStatus==GLEW_ERROR_NO_GLX_DISPLAY) glewStatus=GLEW_OK;
+#endif
+	if(glewStatus != GLEW_OK)
 	{
-		fprintf(stderr, "Failed to initialize GLEW\n");
+		fprintf(stderr, "Failed to initialize GLEW: %s\n", glewGetErrorString(glewStatus));
 		exit(EXIT_FAILURE);
 	}
-	glfwSetWindowTitle("PMX Viewer");
-	//Ensure we can capture the escape key being pressed below
-	glfwEnable( GLFW_STICKY_KEYS );
+	while(glGetError()!=GL_NO_ERROR) {} //glewInit may leave a harmless GL_INVALID_ENUM
 	
-	glfwSetMousePosCallback(mouseMotion);
-	glfwSetMouseWheelCallback(mouseWheel);
+	//Ensure we can capture the escape key being pressed below
+	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
+	
+	glfwSetCursorPosCallback(window, mouseMotion);
+	glfwSetScrollCallback(window, mouseWheel);
+}
+
+bool Viewer::keyPressed(int key)
+{
+	return glfwGetKey(window, key)==GLFW_PRESS;
+}
+
+GLuint Viewer::textureOrWhite(int index)
+{
+	if(index<0 || index>=(int)textures.size()) return whiteTexture;
+	return textures[index];
 }
 
 void Viewer::initUniformVarLocations()
@@ -742,24 +685,25 @@ void Viewer::initUniformVarLocations()
 	
 	uniformVars[uSphereMode]=glGetUniformLocation(shaderProgram, "fSphereMode");
 	
-	uniformVars[uTextureSampler]=glGetUniformLocationARB(shaderProgram,"textureSampler");
-	uniformVars[uSphereSampler]=glGetUniformLocationARB(shaderProgram,"sphereSampler");
-	uniformVars[uToonSampler]=glGetUniformLocationARB(shaderProgram,"toonSampler");
+	uniformVars[uTextureSampler]=glGetUniformLocation(shaderProgram,"textureSampler");
+	uniformVars[uSphereSampler]=glGetUniformLocation(shaderProgram,"sphereSampler");
+	uniformVars[uToonSampler]=glGetUniformLocation(shaderProgram,"toonSampler");
 }
 
 Viewer::~Viewer()
 {
+	if(window) glfwDestroyWindow(window);
 	glfwTerminate();
 }
 
 void Viewer::handleEvents()
 {
 	glfwPollEvents();
-	if(glfwGetKey(GLFW_KEY_UP)==GLFW_PRESS)
+	if(keyPressed(GLFW_KEY_UP))
 	{
 		modelTranslate.y-=0.1;
 	}
-	else if(glfwGetKey(GLFW_KEY_DOWN)==GLFW_PRESS)
+	else if(keyPressed(GLFW_KEY_DOWN))
 	{
 		modelTranslate.y+=0.1;
 	}

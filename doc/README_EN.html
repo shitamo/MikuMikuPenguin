@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LibMikuMikuPenguin (libmmp) v0.1 Readme</title>
+<style>body{font-family:sans-serif;max-width:50em;margin:2em auto;padding:0 1em;line-height:1.6}pre{white-space:pre-wrap}</style>
+</head>
+<body>
+<h1>LibMikuMikuPenguin (libmmp) v0.1 Readme</h1>
+<pre>[2026 modernisation]
+Ported from GLFW 2 to GLFW 3, updated for current GLM (0.9.9 / 1.x), and the
+shaders were fixed to run on any OpenGL 3.3 core profile driver (including Mesa).
+Required libraries: GLFW 3, GLEW, GLM, Bullet, SOIL (SDL2 and SDL2_mixer for music)
+
+Controls:
+  left drag: rotate camera / wheel: zoom / Up, Down: move model
+  Q (hold): pause physics / A (hold): hide model
+  S, D, F, G (hold): Bullet debug drawing / Esc: quit
+
+
+Hello.
+
+I wanted to MikuMiku on my favorite operating system, so I wrote a program to do just that.
+It&#x27;s still very buggy, and the API isn&#x27;t particularly fixed in any manner so it&#x27;s still too early to effectively use MMP as a library.
+However, I hope that this becomes a starting point for the development of MMD on operating systems other than Windows (although you actually can use this library in Windows).
+
+You should be able to get the latest version of the source code here:
+https://github.com/sn0w75/MikuMikuPenguin/
+
+The contents are listed below:
+COPYING - This license for MikuMikuPenguin is included in here.
+doc - This is a folder for putting various documentation into, but there&#x27;s nothing in here in particular at this point in time.
+include - LibMikuMikuPenguin&#x27;s header (.h) files are in this folder.
+INSTALL - Details on the installation of LibMikuMikuPenguin are available in this file (English only)
+libmmp - LibMikuMikuPenguin&#x27;s source (.cpp) files are in this folder.
+shaders - PMXViewer&#x27;s shaders are in this folder.
+src - PMXViewer&#x27;s source code (.cpp, .h) are in this folder.
+data - Required textures and other data files are in this folder.
+
+For LibMikuMikuPenguin, libglfw, libglew, libglm, and libBullet are needed.
+For PMXViewer, libmmp and libSOIL are needed. If you want to play music along with the VMD motion, you&#x27;ll need SDL2 and SDL2_mixer. (You can compile the code without music playback support)
+
+This source code uses autotools, so compiling the code is very simple:
+To compile, run the following commands in a terminal:
+./configure
+make
+To install libmmp and PMXViewer on your system, run:
+sudo make install
+(There may be an alternative to &#x27;sudo&#x27; you need to use depending on your distro to run a process with admin privileges.)
+
+If you have any other questions, please toss me a message. I&#x27;ll gladly help you out.
+Twitter- http://twitter.com/sn0w75
+E-mail- ibenrunnin@gmail.com</pre>
+</body>
+</html>

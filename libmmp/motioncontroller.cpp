@@ -7,13 +7,7 @@
 
 #define GLM_FORCE_RADIANS
 
-#include <glm/gtc/matrix_transform.hpp> 
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/transform.hpp>
-#include <glm/gtx/quaternion.hpp>
-#include <glm/gtx/compatibility.hpp>
-#include <glm/gtx/norm.hpp>
-#include <glm/gtx/euler_angles.hpp>
+#include "mmp_glm.h"
 
 //#define MODELDUMP true
 
@@ -424,7 +418,7 @@ void VMDMotionController::updateIK()
 						axis=glm::normalize(vv);
 					}*/
 					
-					rotation = glm::rotate((float)(180.0/M_PI*angle), axis);
+					rotation = glm::rotate((float)angle, axis);
 					
 					/*if(IKLink->angleLimit)
 					{						
@@ -664,7 +658,7 @@ void VMDMotionController::updateIK()
 						glm::vec4 t(0,0,1,1);
 
 						t= t*def;
-						if(t.y < 0) rotation = glm::rotate(-(float)(180.0/M_PI*angle), axis);
+						if(t.y < 0) rotation = glm::rotate(-(float)angle, axis);
 
 						float l = glm::length(localTargetPos) / glm::length(localEffectorPos);
 						if(fabs(angle) <= M_PI/2.0 && l < 1.0f)
@@ -678,12 +672,12 @@ void VMDMotionController::updateIK()
 							{
 								diff = diff_limit;
 							}
-							if(abs(angle) > 1.0e-6f) diff *= angle/abs(angle);
+							if(fabs(angle) > 1.0e-6f) diff *= angle/fabs(angle);
 
 							angle += diff;
 
 							glm::vec3 xaxis(1,0,0);
-							rotation = glm::rotate((float)(180.0/M_PI*angle), xaxis);
+							rotation = glm::rotate((float)angle, xaxis);
 						}
 					}
 					
@@ -838,7 +832,7 @@ void limitAngle(glm::quat &pvec4Out, const glm::quat &pvec4Src, PMXIKLink *link)
 
 	//glm::eulerAngles(pvec4Src);
 	// XYZ軸回転の取得
-	vec3Angle = glm::eulerAngles(pvec4Src) * 3.14159f / 180.f; //QuaternionToEuler( &vec3Angle, pvec4Src );
+	vec3Angle = glm::eulerAngles(pvec4Src); //radians in GLM >= 0.9.6 //QuaternionToEuler( &vec3Angle, pvec4Src );
 	//cout<<vec3Angle.x<<" "<<vec3Angle.y<<" "<<vec3Angle.z<<endl;
 
 	// 角度制限

@@ -1,17 +1,15 @@
-# what flags you want to pass to the C compiler & linker
-__top_builddir__pmx_CPPFLAGS = -c -DDATA_PATH=\"$(pkgdatadir)\" -I$(top_srcdir)/include -I/usr/include/bullet -std=c++11
-__top_builddir__pmx_LDFLAGS = -ggdb
-__top_builddir__pmx_LDADD = ../libmmp/libmmp.la -lglfw -lGLU -lGLEW -lGL -lSOIL -lBulletDynamics -lBulletCollision -lLinearMath -lBulletSoftBody
+bin_PROGRAMS = pmx
 
-# this lists the binaries to produce, the (non-PHONY, binary) targets in
-# the previous manual Makefile
-bin_PROGRAMS = $(top_builddir)/pmx
-__top_builddir__pmx_SOURCES = main.cpp pmxvLogger.cpp viewer.cpp viewer.h pmxvLogger.h
-
+pmx_SOURCES = main.cpp pmxvLogger.cpp viewer.cpp viewer.h pmxvLogger.h sound.h
+pmx_CPPFLAGS = -DDATA_PATH=\"$(pkgdatadir)\" -I$(top_srcdir)/include \
+	$(GLFW_CFLAGS) $(GLEW_CFLAGS) $(GL_CFLAGS) $(BULLET_CFLAGS)
+pmx_CXXFLAGS = $(MMP_CXXSTD) $(AM_CXXFLAGS)
+pmx_LDADD = ../libmmp/libmmp.la $(SOIL_LIBS) $(GLFW_LIBS) $(GLEW_LIBS) $(GL_LIBS) $(BULLET_LIBS)
 
 if ENABLE_SOUND
-__top_builddir__pmx_LDADD += -lSDL2 -lSDL2_mixer
-__top_builddir__pmx_SOURCES += sound.h sound.cpp
+pmx_SOURCES += sound.cpp
+pmx_CPPFLAGS += $(SDL2MIXER_CFLAGS)
+pmx_LDADD += $(SDL2MIXER_LIBS)
 else
-__top_builddir__pmx_SOURCES += dummysound.h dummysound.cpp
+pmx_SOURCES += dummysound.h dummysound.cpp
 endif

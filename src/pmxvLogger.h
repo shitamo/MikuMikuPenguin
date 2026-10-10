@@ -25,9 +25,11 @@ protected:
 
 };
 
-#define err pmxvLogger::get()->e
-#define dbg pmxvLogger::get()->d
-#define log pmxvLogger::get()->m
+// NOTE: these used to be named err/dbg/log, which clashes with log() from
+// <cmath> on modern toolchains.
+#define PMXV_ERR pmxvLogger::get()->e
+#define PMXV_DBG pmxvLogger::get()->d
+#define PMXV_LOG pmxvLogger::get()->m
 
 #endif // PMXV_LOGGER_H
 

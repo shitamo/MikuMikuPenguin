@@ -7,6 +7,9 @@
 
 #include "texthandle.h"
 
+#include <string.h>
+#include <cstdlib>
+
 using namespace std;
 
 VMDInfo &readVMD(string filename)
@@ -15,16 +18,21 @@ VMDInfo &readVMD(string filename)
 	VMDInfo &vmdInfo=*vInfo;
 	
 	ifstream miku(filename.c_str(), ios::in | ios::binary);
-	if(!miku) cerr<<"ERROR: VMD file could not be found: "<<filename<<endl;
+	if(!miku)
+	{
+		cerr<<"ERROR: VMD file could not be found: "<<filename<<endl;
+		exit(EXIT_FAILURE);
+	}
 	
 	//***Extract Header Info***
+	memset(vmdInfo.headerStr, 0, sizeof(vmdInfo.headerStr));
 	miku.read((char*)&vmdInfo.headerStr,30);
 	
 	char modelName[20];
 	miku.read((char*)&modelName,20);
-	vmdInfo.modelName=sjisToUTF8(modelName);
+	vmdInfo.modelName=sjisToUTF8(modelName, sizeof(modelName));
 	
-	cout<<vmdInfo.headerStr<<endl;
+	cout<<string(vmdInfo.headerStr, strnlen(vmdInfo.headerStr, sizeof(vmdInfo.headerStr)))<<endl;
 	//cout<<vmdInfo.modelName<<endl;
 	
 	//***Extract Bone Info***
@@ -40,7 +48,7 @@ VMDInfo &readVMD(string filename)
 		
 		char name[15];
 		miku.read((char*)name,15);
-		f->name=sjisToUTF8(name);
+		f->name=sjisToUTF8(name, sizeof(name));
 		
 		miku.read((char*)&f->frame,4);
 		
@@ -121,7 +129,7 @@ VMDInfo &readVMD(string filename)
 		
 		char name[15];
 		miku.read((char*)&name,15);
-		f->name=sjisToUTF8(name);
+		f->name=sjisToUTF8(name, sizeof(name));
 		
 		miku.read((char*)&f->frame,4);
 		miku.read((char*)&f->value,4);
@@ -154,7 +162,7 @@ VMDInfo &readVMD(string filename)
 		
 		char bezier[24];
 		miku.read((char*)&bezier,24);
-		f->interpolationParameters=sjisToUTF8(bezier);
+		f->interpolationParameters=string(bezier, sizeof(bezier)); //raw bytes, not text
 	}
 	cout<<"done."<<endl;
 	

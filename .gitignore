@@ -1,0 +1,36 @@
+# autotools generated files
+Makefile
+Makefile.in
+/aclocal.m4
+/autom4te.cache/
+/build-aux/
+/config.log
+/config.status
+/configure
+/configure~
+/libtool
+/stamp-h1
+.deps/
+.libs/
+*.o
+*.lo
+*.la
+/src/pmx
+/log.txt
+
+# Debian build artefacts
+/debian/.debhelper/
+/debian/debhelper-build-stamp
+/debian/files
+/debian/*.substvars
+/debian/*.debhelper
+/debian/*.log
+/debian/mikumikupenguin/
+/debian/libmmp-dev/
+/debian/tmp/
+
+#ignore data folder
+data/model/
+data/motion/
+data/stage/
+build/

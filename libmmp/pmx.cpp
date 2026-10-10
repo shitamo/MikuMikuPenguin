@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include <string.h>
+#include <vector>
 
 #include "Converter.h"
 
@@ -158,11 +159,10 @@ void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
 	if(pmxInfo.unicode_type==PMX_ENCODE_UTF16)
 	{
 		//WARNING: UTF-16 text-pulling code does NOT support the extra (multi-byte) codesets of UTF-16!!!!             
-		unsigned short c16[text_size/2+1];
-		memset(c16, 0, text_size+2);
-		miku.read((char*)c16, text_size);
+		std::vector<unsigned short> c16(text_size/2+1, 0);
+		miku.read((char*)c16.data(), text_size);
 
-		result=UTF16to8(c16);
+		result=UTF16to8(c16.data());
 
 		/*ofstream converted;
 		converted.open("converted.txt", ios::out | ios::app);
@@ -179,10 +179,9 @@ void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
 	else
 	{
 		//WARNING: Loading UTF-8 encoded PMX files is untested
-		char c8[text_size];
-		miku.read((char*)&c8,text_size);
-
-		result=c8;
+		std::string c8(text_size, '\0');
+		miku.read(&c8[0],text_size);
+		result.assign(c8.c_str()); //stop at an embedded NUL, if any
 	}
 }
 
@@ -380,8 +379,11 @@ PMXInfo &readPMX(string foldername,string filename)
 	{
 		getPMXText(miku, pmxInfo, pmxInfo.texturePaths[i]);
 		
-		pmxInfo.texturePaths[i].insert(0,"/");
-		pmxInfo.texturePaths[i].insert(0,foldername);
+		if(!foldername.empty())
+		{
+			pmxInfo.texturePaths[i].insert(0,"/");
+			pmxInfo.texturePaths[i].insert(0,foldername);
+		}
 		
 		while(pmxInfo.texturePaths[i].find("\\")!=-1)
 		{

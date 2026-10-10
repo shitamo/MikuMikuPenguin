@@ -1,3 +1,16 @@
+October 10, 2026:
+-Ported from GLFW 2 to GLFW 3 (GLFW 2 is no longer shipped by distributions)
+-Updated for current GLM (0.9.9 / 1.x): radians everywhere, identity
+ default constructors, GLM_ENABLE_EXPERIMENTAL
+-Shaders now target OpenGL 3.3 core (#version 330, texture() instead of
+ texture2D()) so they compile on Mesa; dropped ARB uniform entry points
+-Fixed buffer over-reads in VMD/PMX text decoding, texture index -1 crash,
+ shared toon texture off-by-one, missing-texture crash
+-Case-insensitive texture lookup for models made on Windows
+-Resizable window, aspect ratio follows the framebuffer
+-Build system: pkg-config for dependencies, headers installed under
+ include/libmmp, generated autotools files removed (run ./autogen.sh)
+-Added Debian packaging
 
 January 12, 2014:
 -removed model data file from git repo history

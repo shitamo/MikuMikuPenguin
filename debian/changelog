@@ -1,0 +1,8 @@
+mikumikupenguin (0.1+20261010) unstable; urgency=medium
+
+  * Initial Debian package.
+  * Port to GLFW 3, current GLM and OpenGL 3.3 core profile so that the
+    viewer builds and runs on current Debian.
+  * Fix several memory safety bugs in the PMX/VMD loaders and the viewer.
+
+ -- shitamo <sitamo@gmail.com>  Sat, 10 Oct 2026 17:30:00 +0900

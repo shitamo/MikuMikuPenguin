@@ -1,14 +1,8 @@
 #ifndef GLFW_FUNC_CALLBACKS
 #define GLFW_FUNC_CALLBACKS
 
-#include <GL/glew.h>
-#define GLFW_INCLUDE_GLU
-#include <GL/glfw.h>
-
-#include <glm/gtc/matrix_transform.hpp> 
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/transform.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include "mmp_gl.h"
+#include "mmp_glm.h"
 
 extern float theta;
 extern float zenith;
@@ -23,10 +17,8 @@ extern glm::vec3 cameraTarget;
 extern int prevX,prevY;
 extern int prevWheel;
 
-//***Mouse Variables***
-void GLFWCALL mouseWheel(int pos);
-void GLFWCALL mouseMotion(int x, int y);
-	
-
+//***Mouse Callbacks (GLFW 3)***
+void mouseWheel(GLFWwindow *window, double xoffset, double yoffset);
+void mouseMotion(GLFWwindow *window, double x, double y);
 
 #endif

@@ -4,6 +4,8 @@
 #include "SDL2/SDL_mixer.h"
 
 #include <iostream>
+#include <cstdio>
+#include <cstdlib>
 
 using namespace std;
 
@@ -28,7 +30,8 @@ void initSound(string filename)
 	if(Mix_OpenAudio(audio_rate, audio_format, audio_channels, audio_buffers)==-1)
 	{
 		printf("Error initializing SDL_mixer: %s\n", Mix_GetError());
-		exit(EXIT_FAILURE);
+		printf("Continuing without sound.\n");
+		return;
 	}
 	
 

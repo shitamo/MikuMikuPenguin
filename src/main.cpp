@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cstring>
 
 
 #include <libmmp.h>
@@ -14,7 +15,15 @@
 #include "pmxvLogger.h"
 #include "viewer.h"
 
+#include <strings.h>
+
 using namespace std;
+
+static bool hasSuffix(const string &str, const char *suffix)
+{
+	size_t n=strlen(suffix);
+	return str.size()>=n && strcasecmp(str.c_str()+str.size()-n, suffix)==0;
+}
 
 void printHelpInfo()
 {
@@ -26,6 +35,11 @@ void printHelpInfo()
 	<<"\tIf libmmp was compiled without SDL2_mixer support, no music will play."<<endl<<endl
 	<<"  --help\tdisplay this help and exit"<<endl
 	<<"  --version\toutput version information and exit"<<endl<<endl
+	<<"Controls:"<<endl
+	<<"  left drag\trotate camera      wheel\tzoom"<<endl
+	<<"  Up/Down\tmove model          Q (hold)\tpause physics"<<endl
+	<<"  A (hold)\thide model          S/D/F/G (hold)\tBullet debug drawing"<<endl
+	<<"  Esc\t\tquit"<<endl<<endl
 	<<"FOR JAPANESE DOCUMENTATION, SEE:"<<endl
 	<<"<file://"<<DATA_PATH<<"/doc/README_JP.html>"<<endl<<endl
 	<<"Report bugs to <ibenrunnin@gmail.com> (English or Japanese is ok)."<<endl;
@@ -63,18 +77,22 @@ int main(int argc, char** argv)
 			}
 			else if(string(argv[count]) == "-s")
 			{
-				if(count+1<argc) music_file=argv[count+1];
+				if(count+1<argc) music_file=argv[++count];
 			}
 			else
 			{
 				string str=string(argv[count]);
-				if(str.substr(str.size()-4)==".pmx")
+				if(hasSuffix(str, ".pmx"))
 				{
 					model_file=str;
 				}
-				else if(str.substr(str.size()-4)==".vmd")
+				else if(hasSuffix(str, ".vmd"))
 				{
 					motion_file=str;
+				}
+				else
+				{
+					cerr<<"Ignoring unknown argument: "<<str<<endl;
 				}
 			}
 		}

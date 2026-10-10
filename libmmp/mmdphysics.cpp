@@ -190,7 +190,7 @@ void MMDPhysics::createJoints()
 		
 		
 		glm::mat4 trans, rotation, world, rot_x, rot_y, rot_z;
-		trans=glm::translate(p.x, p.y, p.z);
+		trans=glm::translate(glm::vec3(p.x, p.y, p.z));
 		rotation=glm::yawPitchRoll(r.y, r.x, r.z);
 		world = trans*rotation;	// ジョイントの行列（モデルローカル座標系）
 		

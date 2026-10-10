@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>LibMikuMikuPenguin (libmmp) v0.1 リードミ</title>
+<style>body{font-family:sans-serif;max-width:50em;margin:2em auto;padding:0 1em;line-height:1.6}pre{white-space:pre-wrap}</style>
+</head>
+<body>
+<h1>LibMikuMikuPenguin (libmmp) v0.1 リードミ</h1>
+<pre>【2026年 現行環境対応版について】
+GLFW 2 から GLFW 3 への移行、新しい GLM (0.9.9 / 1.x) への対応、
+OpenGL 3.3 core profile (Mesa 含む) で動くようにシェーダを修正するなどの変更を加えています。
+必要なライブラリ: GLFW 3, GLEW, GLM, Bullet, SOIL（音楽再生には SDL2, SDL2_mixer）
+
+操作方法:
+  左ドラッグ: カメラ回転 / ホイール: ズーム / 上下キー: モデル移動
+  Q(押している間): 物理演算停止 / A(押している間): モデル非表示
+  S,D,F,G(押している間): Bullet デバッグ表示 / Esc: 終了
+
+
+LibMikuMikuPenguin(libmmp) v0.1 リードミ（日本語）
+
+(English translation is available below)
+どうも初めまして。sn0w75です。
+
+自分の好きなOSでミクミクしたくて、それを出来る為のライブラリやプログラムを作ってみました。
+まだバグだらけですし、APIが確定しているわけでもないのでMMPをライブラリとして使うのはまだまだ早いかと思います。
+ですが、これを起点として、Windows意外のOSでのMMDの開発が段々進めていったら～と思ってます。
+
+最新のコードは以下のリンクで手に入れます：
+https://github.com/sn0w75/MikuMikuPenguin/
+
+中身はこんな感じです：
+COPYING　-　このコードのライセンス
+doc　-　ドキュメンテーションを入れる為のフォルダですが、現時点では得に何も入ってません。
+include -　LibMikuMikuPenguinのヘッダ（.h）ファイルがここに入ってます。
+INSTALL　-　このコードのインストール仕方（英語のみ）
+libmmp　-　LibMikuMikuPenguinのソース（.cpp）ファイルがここに入ってます。
+shaders　-　PMXViewerのシェーダーがここに入ってます。
+src　-　PMXViewerのソースコード（.cpp、.h）がここに入ってます。
+data　-　必要なテクスチャ等が入ってます。
+
+LibMikuMikuPenguinにはlibglfw, libglew,libglm,libBulletが必要です。
+PMXViewerにはlibmmp、libSOILが必要です。VMDと一緒に音楽を再生したい場合は、SDL2、SDL2_mixerも必要です。（なくてもコンパイル出来ます）
+
+このソースコードはautotoolsを利用していますので、コンパイルやインストールは簡単です：
+コンパイルするにはターミナルで：
+./configure
+make
+をすれば大丈夫です。
+またシステムにインストールしたい場合は：
+sudo make install
+みたいな感じで大丈夫です。
+
+他に質問がありました、気軽にメッセージ飛ばしてください。喜んで手伝ってあげます：
+Twitter- http://twitter.com/sn0w75
+E-mail- ibenrunnin@gmail.com
+
+それではまた。</pre>
+</body>
+</html>

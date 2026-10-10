@@ -1,0 +1,44 @@
+Source: mikumikupenguin
+Section: graphics
+Priority: optional
+Maintainer: shitamo <sitamo@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               pkgconf | pkg-config,
+               libgl-dev,
+               libglfw3-dev,
+               libglew-dev,
+               libglm-dev,
+               libbullet-dev,
+               libsoil-dev,
+               libsdl2-dev,
+               libsdl2-mixer-dev
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://github.com/sn0w75/MikuMikuPenguin
+
+Package: mikumikupenguin
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: MikuMikuDance PMX/VMD viewer for Linux
+ MikuMikuPenguin is a library (libmmp) and a demonstration viewer for
+ MikuMikuDance (MMD) data.  The viewer, pmx, loads a PMX 2.0 model and plays
+ a VMD motion on it with toon shading and Bullet physics, optionally playing
+ music through SDL2_mixer.
+ .
+ An OpenGL 3.3 core profile capable driver is required.
+
+Package: libmmp-dev
+Section: libdevel
+Architecture: any
+Depends: libgl-dev,
+         libglfw3-dev,
+         libglew-dev,
+         libglm-dev,
+         libbullet-dev,
+         ${misc:Depends}
+Description: MikuMikuPenguin library (static) and headers
+ MikuMikuPenguin (libmmp) loads MikuMikuDance PMX 2.0 models and VMD motions,
+ evaluates bone animation and IK, and simulates rigid bodies with Bullet.
+ .
+ This package contains the static library and the C++ headers
+ (installed under /usr/include/libmmp).  The API is not stable.

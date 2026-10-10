@@ -1,10 +1,7 @@
 #ifndef MOTION_CONTROLLER_H
 #define MOTION_CONTROLLER_H
 
-#include <GL/glew.h>
-#define GLFW_INCLUDE_GLU
-#include <GL/glfw.h>
-
+#include "mmp_gl.h"
 #include "pmx.h"
 #include "vmd.h"
 

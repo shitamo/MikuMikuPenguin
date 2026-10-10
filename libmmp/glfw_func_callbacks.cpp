@@ -1,5 +1,7 @@
 #include "glfw_func_callbacks.h"
 
+#include <cmath>
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -19,19 +21,20 @@ int prevX=0,prevY=0;
 int prevWheel=0;
 
 
-void GLFWCALL mouseWheel(int pos)
+void mouseWheel(GLFWwindow *window, double xoffset, double yoffset)
 {
-	int dWheel=pos-prevWheel;
-	if(dWheel>0) //up
+	(void)window; (void)xoffset;
+	if(yoffset>0) //up
 	{
 		radius-=1.0f;
+		if(radius<1.0f) radius=1.0f;
 		t=radius*cos(zenith);
 		cameraPosition.y=radius*sin(zenith);
 	
 		cameraPosition.x=t*cos(theta);
 		cameraPosition.z=t*sin(theta);
 	}
-	else if(dWheel<0) //down
+	else if(yoffset<0) //down
 	{
 		radius+=1.0f;
 		t=radius*cos(zenith);
@@ -40,15 +43,14 @@ void GLFWCALL mouseWheel(int pos)
 		cameraPosition.x=t*cos(theta);
 		cameraPosition.z=t*sin(theta);
 	}
-	
-	prevWheel=pos;
 }
 
-void GLFWCALL mouseMotion(int x, int y)
+void mouseMotion(GLFWwindow *window, double xpos, double ypos)
 {
+	int x=(int)xpos, y=(int)ypos;
 	int dx=prevX-x,dy=y-prevY;
 
-	if(glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT))
+	if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS)
 	{
 		theta+=dx/250.0f;
 		zenith+=dy/250.0f;
