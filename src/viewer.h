@@ -18,6 +18,7 @@ enum Uniform_IDs {
 	uHalfVector,uLightDirection,
 	uSphereMode,
 	uTextureSampler,uSphereSampler,uToonSampler,
+	uTextureMul,uTextureAdd,
 	NumUniforms };
 
 namespace ClosedMMDFormat

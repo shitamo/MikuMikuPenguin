@@ -319,6 +319,18 @@ void Viewer::drawModel(bool drawEdges)
 	int faceCount=0;
 	for(int m=0; m<pmxInfo->material_continuing_datasets; ++m) //pmxInfo->material_continuing_datasets
 	{
+		const VMDMotionController::MaterialState &mat=motionController->materialStates[m];
+		
+		//Hidden materials (diffuse alpha 0, typically switched by material
+		//morphs) and materials without edges are skipped.
+		bool skip = mat.diffuse.a <= 0.0f;
+		if(drawEdges && (!pmxInfo->materials[m]->drawEdges || mat.edgeSize <= 0.0f || mat.edgeColor.a <= 0.0f)) skip = true;
+		if(skip)
+		{
+			faceCount+=pmxInfo->materials[m]->hasFaceNum;
+			continue;
+		}
+		
 		
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D,textureOrWhite(pmxInfo->materials[m]->textureIndex));
@@ -347,16 +359,18 @@ void Viewer::drawModel(bool drawEdges)
 		}
 		
 		
-		glUniform3fv(uniformVars[uAmbient],1,(GLfloat*)&pmxInfo->materials[m]->ambient);
-		glUniform4fv(uniformVars[uDiffuse],1,(GLfloat*)&pmxInfo->materials[m]->diffuse);
-		glUniform3fv(uniformVars[uSpecular],1,(GLfloat*)&pmxInfo->materials[m]->specular);
+		glUniform3fv(uniformVars[uAmbient],1,(GLfloat*)&mat.ambient);
+		glUniform4fv(uniformVars[uDiffuse],1,(GLfloat*)&mat.diffuse);
+		glUniform3fv(uniformVars[uSpecular],1,(GLfloat*)&mat.specular);
+		glUniform4fv(uniformVars[uTextureMul],1,(GLfloat*)&mat.textureMul);
+		glUniform4fv(uniformVars[uTextureAdd],1,(GLfloat*)&mat.textureAdd);
 		
-		glUniform1f(uniformVars[uShininess],mmp::scalarNormalize(pmxInfo->materials[m]->shininess));
+		glUniform1f(uniformVars[uShininess],mmp::scalarNormalize(mat.shininess));
 		glUniform3f(uniformVars[uHalfVector],halfVector.x,halfVector.y,halfVector.z);
 		glUniform3f(uniformVars[uLightDirection],lightDirection.x,lightDirection.y,lightDirection.z);
 		
-		glUniform4fv(uniformVars[uEdgeColor],1,(GLfloat*)&pmxInfo->materials[m]->edgeColor);
-		glUniform1f(uniformVars[uEdgeSize],mmp::scalarNormalize(pmxInfo->materials[m]->edgeSize));
+		glUniform4fv(uniformVars[uEdgeColor],1,(GLfloat*)&mat.edgeColor);
+		glUniform1f(uniformVars[uEdgeSize],mmp::scalarNormalize(mat.edgeSize));
 		
 		glUniform1f(uniformVars[uSphereMode],pmxInfo->materials[m]->sphereMode);
         
@@ -701,6 +715,8 @@ void Viewer::initUniformVarLocations()
 	uniformVars[uTextureSampler]=glGetUniformLocation(shaderProgram,"textureSampler");
 	uniformVars[uSphereSampler]=glGetUniformLocation(shaderProgram,"sphereSampler");
 	uniformVars[uToonSampler]=glGetUniformLocation(shaderProgram,"toonSampler");
+	uniformVars[uTextureMul]=glGetUniformLocation(shaderProgram,"textureMul");
+	uniformVars[uTextureAdd]=glGetUniformLocation(shaderProgram,"textureAdd");
 }
 
 Viewer::~Viewer()

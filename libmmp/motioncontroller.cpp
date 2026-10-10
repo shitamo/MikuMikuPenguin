@@ -143,6 +143,14 @@ VMDMotionController::VMDMotionController(PMXInfo &pmxInfo,VMDInfo &vmdInfo,GLuin
 		modeldump << vertexData[i].str();
 		#endif
 	}
+	//Remember which vertex buffer belongs to the model: the caller binds it
+	//before constructing us, but other code (e.g. the Bullet debug drawer)
+	//binds its own buffers later, so bind it explicitly when uploading.
+	{
+		GLint bound=0;
+		glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &bound);
+		vertexBuffer=(GLuint)bound;
+	}
 	glBufferData(GL_ARRAY_BUFFER, pmxInfo.vertex_continuing_datasets*sizeof(VertexData), vertexData, GL_STREAM_DRAW);
 	
 	morphKeyFrames.resize(pmxInfo.morph_continuing_datasets);
@@ -178,69 +186,175 @@ VMDMotionController::~VMDMotionController()
 
 void VMDMotionController::updateVertexMorphs()
 {
-	for(unsigned i=0; i<pmxInfo.vertex_continuing_datasets; i++)
+	const int morphCount=pmxInfo.morph_continuing_datasets;
+	
+	//***1. Keyframe value of every morph (all morph types)***
+	for(int i=0; i<morphCount; ++i)
+	{
+		if(ite_morphKeyFrames[i] != morphKeyFrames[i].end())
+		{
+			unsigned long t0=(*ite_morphKeyFrames[i]).frame*2; //MMD=30fps, this program=60fps, 60/30=2
+			float val0=(*ite_morphKeyFrames[i]).value;
+			
+			if(++ite_morphKeyFrames[i] != morphKeyFrames[i].end())
+			{
+				unsigned long t1=(*ite_morphKeyFrames[i]).frame*2;
+				float val1=(*ite_morphKeyFrames[i]).value;
+				
+				float s = (t1>t0) ? ((float)time - (float)t0)/(float)(t1 - t0) : 1.0f;	//Linear Interpolation
+				s = glm::clamp(s, 0.0f, 1.0f);
+				vMorphWeights[i]=val0 + (val1 - val0)*s;
+				
+				if(time!=t1) --ite_morphKeyFrames[i];
+			}
+			else
+			{
+				vMorphWeights[i]=val0; //past the last key: hold its value
+			}
+		}
+	}
+	
+	//***2. Effective weights: group morphs distribute their weight to members***
+	morphWeights.assign(vMorphWeights.begin(), vMorphWeights.end());
+	for(int i=0; i<morphCount; ++i)
+	{
+		PMXMorph *morph=pmxInfo.morphs[i];
+		if(morph->type!=MORPH_TYPE_GROUP || vMorphWeights[i]==0.0f) continue;
+		for(int j=0; j<morph->morphOffsetNum; ++j)
+		{
+			PMXGroupMorph *g=(PMXGroupMorph*)morph->offsetData[j];
+			if(g->morphIndex<0 || g->morphIndex>=morphCount || g->morphIndex==i) continue;
+			if(pmxInfo.morphs[g->morphIndex]->type==MORPH_TYPE_GROUP) continue; //nesting is not allowed by PMX
+			morphWeights[g->morphIndex]+=vMorphWeights[i]*g->morphRate;
+		}
+	}
+	
+	//***3. Reset vertices to the rest state***
+	for(int i=0; i<pmxInfo.vertex_continuing_datasets; i++)
 	{
 		vertexData[i].position.x=pmxInfo.vertices[i]->pos.x;
 		vertexData[i].position.y=pmxInfo.vertices[i]->pos.y;
 		vertexData[i].position.z=pmxInfo.vertices[i]->pos.z;
 		vertexData[i].position.w=1.0f;
+		vertexData[i].UV.x=pmxInfo.vertices[i]->UV.x;
+		vertexData[i].UV.y=pmxInfo.vertices[i]->UV.y;
 	}
 	
-	for(unsigned i=0; i<pmxInfo.morph_continuing_datasets; ++i)
+	//***4. Vertex and UV morphs***
+	for(int i=0; i<morphCount; ++i)
 	{
 		PMXMorph *morph=pmxInfo.morphs[i];
+		float w=morphWeights[i];
+		if(w==0.0f) continue;
 		
 		if(morph->type==MORPH_TYPE_VERTEX)
 		{
-			unsigned long t0,t1;
-			float val0,val1; //morph values to interpolate between
-			glm::vec3 p0,p1;
-			
-			float ipolValue=0.0f; //interpolated value
-			
-			if(ite_morphKeyFrames[i] != morphKeyFrames[i].end())
-			{
-				t0=(*ite_morphKeyFrames[i]).frame*2; //MMD=30fps, this program=60fps, 60/30=2
-				val0= (*ite_morphKeyFrames[i]).value;
-				
-				//cout<<morph->name<<" "<<(*ite_morphKeyFrames[i]).name<<val0<<endl;
-			
-				if(++ite_morphKeyFrames[i] != morphKeyFrames[i].end())
-				{
-					t1 = (*ite_morphKeyFrames[i]).frame*2;
-					val1 = (*ite_morphKeyFrames[i]).value;
-				
-					float s = (t1>t0) ? ((float)time - (float)t0)/(float)(t1 - t0) : 1.0f;	//Linear Interpolation
-					s = glm::clamp(s, 0.0f, 1.0f);
-					
-					
-					//ipolValue=val0 + (val1 - val0)*s;
-					vMorphWeights[i]=val0 + (val1 - val0)*s;
-					
-					if(time!=t1) --ite_morphKeyFrames[i];
-				}
-			}
-			
-			//cout<<ipolValue<<endl;
-			
 			for(int j=0; j<morph->morphOffsetNum; ++j)
 			{
 				PMXVertexMorph *vMorph=(PMXVertexMorph*) morph->offsetData[j];
 				if(vMorph->vertexIndex<0 || vMorph->vertexIndex>=pmxInfo.vertex_continuing_datasets) continue;
-				glm::vec3 &morphTarget=vMorph->coordinateOffset;
-				
-				glm::vec3 diffVector=morphTarget;
-				
-				vertexData[vMorph->vertexIndex].position.x+=diffVector.x * vMorphWeights[i];
-				vertexData[vMorph->vertexIndex].position.y+=diffVector.y * vMorphWeights[i];
-				vertexData[vMorph->vertexIndex].position.z+=diffVector.z * vMorphWeights[i];
-				vertexData[vMorph->vertexIndex].position.w=1.0f;
-				//vertexData[vMorph->vertexIndex].position.w=vertexPosition.w;
+				glm::vec4 &p=vertexData[vMorph->vertexIndex].position;
+				p.x+=vMorph->coordinateOffset.x * w;
+				p.y+=vMorph->coordinateOffset.y * w;
+				p.z+=vMorph->coordinateOffset.z * w;
 			}
+		}
+		else if(morph->type==MORPH_TYPE_UV)
+		{
+			for(int j=0; j<morph->morphOffsetNum; ++j)
+			{
+				PMXUVMorph *uvMorph=(PMXUVMorph*) morph->offsetData[j];
+				if(uvMorph->vertexIndex<0 || uvMorph->vertexIndex>=pmxInfo.vertex_continuing_datasets) continue;
+				glm::vec2 &uv=vertexData[uvMorph->vertexIndex].UV;
+				uv.x+=uvMorph->UVOffsetAmount.x * w;
+				uv.y+=uvMorph->UVOffsetAmount.y * w;
+			}
+		}
+		//TODO: extra UV morphs (types 4-7) need extra UV support
+	}
+	
+	//***5. Material morphs***
+	updateMaterialMorphs();
+	
+	GLint previous=0;
+	glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previous);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+	glBufferData(GL_ARRAY_BUFFER, pmxInfo.vertex_continuing_datasets*sizeof(VertexData), vertexData, GL_DYNAMIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, (GLuint)previous);
+}
+
+void VMDMotionController::updateMaterialMorphs()
+{
+	const int matCount=pmxInfo.material_continuing_datasets;
+	
+	//multiplicative and additive accumulators per material (MMD: base*mul + add)
+	struct Acc { MaterialState mul, add; };
+	std::vector<Acc> acc(matCount);
+	for(int m=0; m<matCount; ++m)
+	{
+		MaterialState &mu=acc[m].mul, &ad=acc[m].add;
+		mu.diffuse=glm::vec4(1.0f); mu.specular=glm::vec3(1.0f); mu.shininess=1.0f; mu.ambient=glm::vec3(1.0f);
+		mu.edgeColor=glm::vec4(1.0f); mu.edgeSize=1.0f; mu.textureMul=glm::vec4(1.0f); mu.textureAdd=glm::vec4(0.0f);
+		ad.diffuse=glm::vec4(0.0f); ad.specular=glm::vec3(0.0f); ad.shininess=0.0f; ad.ambient=glm::vec3(0.0f);
+		ad.edgeColor=glm::vec4(0.0f); ad.edgeSize=0.0f; ad.textureMul=glm::vec4(0.0f); ad.textureAdd=glm::vec4(0.0f);
+	}
+	
+	for(int i=0; i<pmxInfo.morph_continuing_datasets; ++i)
+	{
+		PMXMorph *morph=pmxInfo.morphs[i];
+		float w=morphWeights[i];
+		if(morph->type!=MORPH_TYPE_MATERIAL || w==0.0f) continue;
+		
+		for(int j=0; j<morph->morphOffsetNum; ++j)
+		{
+			PMXMaterialMorph *mm=(PMXMaterialMorph*) morph->offsetData[j];
+			int first=mm->materialIndex, last=mm->materialIndex;
+			if(mm->materialIndex==-1) { first=0; last=matCount-1; } //all materials
+			if(first<0 || last>=matCount) continue;
 			
+			for(int m=first; m<=last; ++m)
+			{
+				if(mm->offsetCalculationFormula==0) //multiplication: lerp(1, value, w)
+				{
+					MaterialState &mu=acc[m].mul;
+					mu.diffuse   *= glm::mix(glm::vec4(1.0f), mm->diffuse, w);
+					mu.specular  *= glm::mix(glm::vec3(1.0f), mm->specular, w);
+					mu.shininess *= glm::mix(1.0f, mm->shininess, w);
+					mu.ambient   *= glm::mix(glm::vec3(1.0f), mm->ambient, w);
+					mu.edgeColor *= glm::mix(glm::vec4(1.0f), mm->edgeColor, w);
+					mu.edgeSize  *= glm::mix(1.0f, mm->edgeSize, w);
+					mu.textureMul*= glm::mix(glm::vec4(1.0f), mm->textureCoefficient, w);
+				}
+				else //addition
+				{
+					MaterialState &ad=acc[m].add;
+					ad.diffuse   += mm->diffuse * w;
+					ad.specular  += mm->specular * w;
+					ad.shininess += mm->shininess * w;
+					ad.ambient   += mm->ambient * w;
+					ad.edgeColor += mm->edgeColor * w;
+					ad.edgeSize  += mm->edgeSize * w;
+					ad.textureAdd+= mm->textureCoefficient * w;
+				}
+			}
 		}
 	}
-	glBufferData(GL_ARRAY_BUFFER, pmxInfo.vertex_continuing_datasets*sizeof(VertexData), vertexData, GL_DYNAMIC_DRAW);
+	
+	materialStates.resize(matCount);
+	for(int m=0; m<matCount; ++m)
+	{
+		PMXMaterial *base=pmxInfo.materials[m];
+		MaterialState &st=materialStates[m];
+		const MaterialState &mu=acc[m].mul, &ad=acc[m].add;
+		st.diffuse   = base->diffuse   * mu.diffuse   + ad.diffuse;
+		st.specular  = base->specular  * mu.specular  + ad.specular;
+		st.shininess = base->shininess * mu.shininess + ad.shininess;
+		st.ambient   = base->ambient   * mu.ambient   + ad.ambient;
+		st.edgeColor = base->edgeColor * mu.edgeColor + ad.edgeColor;
+		st.edgeSize  = base->edgeSize  * mu.edgeSize  + ad.edgeSize;
+		st.textureMul= mu.textureMul;
+		st.textureAdd= ad.textureAdd;
+	}
 }
 
 void VMDMotionController::updateBoneMatrix()

@@ -1,3 +1,12 @@
+mikumikupenguin (0.2.1+20261010.5) unstable; urgency=medium
+
+  * Honour material diffuse alpha and the edge flag.
+  * Implement UV, material and group morphs.
+  * Upload vertex morphs to the model's own vertex buffer.
+  * Remove a debug branch in the fragment shader.
+
+ -- shitamo <sitamo@gmail.com>  Sat, 10 Oct 2026 23:10:00 +0900
+
 mikumikupenguin (0.2.1+20261010.4) unstable; urgency=medium
 
   * Resolve bone parents after all bones are loaded; models with a parent

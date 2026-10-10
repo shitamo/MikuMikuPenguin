@@ -18,6 +18,10 @@ uniform float edgeSize;
 
 uniform float fSphereMode; //sphereMode stored as a float
 
+//material morph texture coefficients: tex = tex*textureMul + textureAdd
+uniform vec4 textureMul;
+uniform vec4 textureAdd;
+
 
 in vec2 UV;
 in vec3 normal;
@@ -51,13 +55,17 @@ void main()
 	
 	vec3 textureColor=vec3(1.0,1.0,1.0);
 	
-	textureColor*=texture(textureSampler, UV).rgb;
+	vec4 texel = texture(textureSampler, UV) * textureMul + textureAdd;
+	texel = clamp(texel, 0.0, 1.0);
+	textureColor *= texel.rgb;
 	
 	vec4 sphereColor=getSphereColor();
 	
 	//finalColor*=sphereColor;
 	
-	if((UV[0]!=0 && UV[1]!=0))
+	//(an old IK-marker debug branch used to colour vertices whose UV had a 0
+	// component pink/green; it has been removed)
+	
 	{
 		float intensity = dot(normalize(normal),lightDirection);
 		vec3 lightColor=normalize(vec3(1.0,1.0,0.95));
@@ -88,7 +96,7 @@ void main()
         vec3 toon = texture(toonSampler, toonCoord).rgb;
 		
 		vec3 colorRGB=min((textureColor*scatteredLight) + reflectedLight,vec3(1.0));
-		color=vec4(colorRGB,texture(textureSampler, UV).a);
+		color=vec4(colorRGB, texel.a * diffuse.a);
 		
 		/*if(sphereMode==1)
 		{
@@ -108,24 +116,5 @@ void main()
 		}*/
 		
 	}
-	else
-	{
-		if(normal.x==1)
-		{
-			color = vec4(0.0, 1.0, 0.0, 1.0);
-		}
-		else if(normal.y==1)
-		{
-			color = vec4(0.0, 0.4, 1.0, 1.0);
-		}
-		else
-		{
-			color = vec4(1.0, 0.5, 0.5, 0.5);
-		}
-		//vec2 pos={0.1,0.1};
-		
-		//color = texture(textureSampler, UV).rgb;
-		//color = texture(textureSampler, UV).rgb;
-		//color = texture(textureSampler2, UV).rgb;
-	}
+
 }

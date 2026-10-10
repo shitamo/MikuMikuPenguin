@@ -18,6 +18,15 @@ October 10, 2026 (merge of weimingtom/MMP v0.2.1):
  arms and knees keep their volume when bent or twisted
 -Bone parents are resolved after all bones are read; models whose parent
  bone comes later in the list crashed while loading
+-Material diffuse alpha is honoured; hidden (alpha 0) materials are no
+ longer drawn, materials without the edge flag get no outline
+-Implemented UV morphs, material morphs (multiply/add, incl. texture
+ coefficient) and group morphs; morph weights are evaluated for all types
+-Vertex morph uploads now bind the model's own vertex buffer (they could
+ end up in the Bullet debug buffer, so e.g. the first frame's facial
+ morphs of a pose VMD were lost)
+-Removed an IK-marker debug branch in the fragment shader that coloured
+ vertices with a 0 UV component pink
 
 October 10, 2026:
 -Ported from GLFW 2 to GLFW 3 (GLFW 2 is no longer shipped by distributions)

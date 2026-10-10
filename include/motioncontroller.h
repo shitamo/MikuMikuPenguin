@@ -71,7 +71,24 @@ class VMDMotionController
 										//!< \if JAPANESE \brief モデルの現在ポーズを表すボーン変形行列の配列へのポインター。 \endif
 	glm::mat4 *invBindPose;				//!< \if ENGLISH \brief A pointer to an array of bone transformation matrices that represent the inverse of the model's initial pose. \endif
 										//!< \if JAPANESE \brief モデルの初期ポーズの逆性を表すボーン変形行列の配列へのポインター。 \endif
-	VertexData *vertexData;				//!< \if ENGLISH \brief A pointer to the array of vertices that the model is made of. \endif
+	VertexData *vertexData;
+	
+	//! Per-material values after applying material morphs (same order as pmxInfo.materials)
+	struct MaterialState
+	{
+		glm::vec4 diffuse;
+		glm::vec3 specular;
+		float shininess;
+		glm::vec3 ambient;
+		glm::vec4 edgeColor;
+		float edgeSize;
+		glm::vec4 textureMul; //texture colour = texture*textureMul + textureAdd
+		glm::vec4 textureAdd;
+	};
+	std::vector<MaterialState> materialStates;
+	
+	//! Effective weight of every morph this frame (VMD value + group morph contributions)
+	std::vector<float> morphWeights;				//!< \if ENGLISH \brief A pointer to the array of vertices that the model is made of. \endif
 										//!< \if JAPANESE \brief モデルが出来ている頂点の配列へのポインター。 \endif
 	
 	
@@ -81,6 +98,7 @@ class VMDMotionController
 	void updateChildren(ClosedMMDFormat::PMXBone *linkBone);
 	void updateIK();
 	void updateInheritance(); //PMX rotation/translation inheritance ("付与")
+	void updateMaterialMorphs();
 	void applyInheritance(int boneIndex, std::vector<char> &state);
 	void solveIK(ClosedMMDFormat::PMXBone *joint, int effector, glm::vec3 targetPos, int numIteration, int numBones, int numMaxBones);
 	
@@ -91,6 +109,7 @@ class VMDMotionController
 	private:
 	GLuint Bones_loc; //uniform location of the boneTexture sampler in the shader
 	GLuint boneBuffer; //GL_TEXTURE_BUFFER holding skinMatrix[]
+	GLuint vertexBuffer; //model vertex buffer (GL_ARRAY_BUFFER bound at construction)
 	GLuint boneTexture; //buffer texture view of boneBuffer
 	
 	//***BONE TRANSFORMATION VARIABLES
