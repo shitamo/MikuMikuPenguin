@@ -16,6 +16,8 @@ October 10, 2026 (merge of weimingtom/MMP v0.2.1):
 -libmmp.h no longer includes the viewer-only glfw_func_callbacks.h
 -Implemented SDEF skinning (was approximated with BDEF2): elbows, upper
  arms and knees keep their volume when bent or twisted
+-Bone parents are resolved after all bones are read; models whose parent
+ bone comes later in the list crashed while loading
 
 October 10, 2026:
 -Ported from GLFW 2 to GLFW 3 (GLFW 2 is no longer shipped by distributions)

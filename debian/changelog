@@ -1,3 +1,11 @@
+mikumikupenguin (0.2.1+20261010.4) unstable; urgency=medium
+
+  * Resolve bone parents after all bones are loaded; models with a parent
+    bone listed after its child crashed (segfault) while loading.
+  * Remove a leftover debug print ("sizeinfo").
+
+ -- shitamo <sitamo@gmail.com>  Sat, 10 Oct 2026 22:55:00 +0900
+
 mikumikupenguin (0.2.1+20261010.3) unstable; urgency=medium
 
   * Implement SDEF skinning in the vertex shader instead of approximating

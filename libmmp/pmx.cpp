@@ -438,11 +438,9 @@ namespace ClosedMMDFormat
 			//***Pull Parent Index***
 			getPMXIndex(miku, bone->parentBoneIndex, pmxInfo.boneIndexSize);
 			
-			if(bone->parentBoneIndex != -1) {
-				bone->parent = pmxInfo.bones[bone->parentBoneIndex];
-			} else {
-				bone->parent = NULL;
-			}
+			//The parent may come LATER in the bone list (allowed by PMX), so the
+			//pointer is resolved after all bones have been read.
+			bone->parent = NULL;
 			
 			/*cout<<(int)*tmpBoneIndex<<endl;
 			cout<<"PBI: "<<bone->parentBoneIndex<<endl;*/
@@ -547,6 +545,40 @@ namespace ClosedMMDFormat
 				}
 			}
 			pmxInfo.bones.push_back(bone);
+		}
+
+		//resolve parent pointers (parents may have a larger index than the child)
+		for(int i = 0; i < pmxInfo.bone_continuing_datasets; ++i)
+		{
+			PMXBone *bone = pmxInfo.bones[i];
+			int p = bone->parentBoneIndex;
+			if(p >= 0 && p < pmxInfo.bone_continuing_datasets && p != i)
+			{
+				bone->parent = pmxInfo.bones[p];
+			}
+			else
+			{
+				if(p != -1) cerr<<"WARNING: bone "<<bone->name<<" has an invalid parent index "<<p<<endl;
+				bone->parentBoneIndex = -1;
+				bone->parent = NULL;
+			}
+		}
+		//guard against parent cycles, which would make calculateGlobalMatrix() recurse forever
+		for(int i = 0; i < pmxInfo.bone_continuing_datasets; ++i)
+		{
+			PMXBone *slow = pmxInfo.bones[i], *fast = pmxInfo.bones[i];
+			while(fast && fast->parent)
+			{
+				slow = slow->parent;
+				fast = fast->parent->parent;
+				if(slow == fast)
+				{
+					cerr<<"WARNING: bone parent cycle at "<<pmxInfo.bones[i]->name<<"; detaching it"<<endl;
+					pmxInfo.bones[i]->parent = NULL;
+					pmxInfo.bones[i]->parentBoneIndex = -1;
+					break;
+				}
+			}
 		}
 
 		// calculate and set transformation matrix from parent bone
