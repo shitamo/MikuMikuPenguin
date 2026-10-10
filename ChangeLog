@@ -1,1 +1,7 @@
-January X, 2014- ver 0.1 release
+
+January 12, 2014:
+-removed model data file from git repo history
+-Updated README with info on libglm,libglew,
+-Fixed bug that caused SDL2/SDL2_mixer to be required even with enable-sound turned off (or SDL2/SDL2_mixer unavailable)
+
+January 11, 2014: ver 0.1 release
