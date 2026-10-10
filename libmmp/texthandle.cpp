@@ -43,3 +43,32 @@ std::string sjisToUTF8(const char *sjis)
 {
 	return sjisToUTF8(sjis, MAX_BUF);
 }
+
+std::string UTF8ToSJIS(const char *utf8)
+{
+	if(!utf8) return std::string();
+	std::size_t len=strlen(utf8);
+	if(len==0) return std::string();
+	
+	iconv_t ic=iconv_open("CP932", "UTF-8");
+	if(ic==(iconv_t)-1) ic=iconv_open("SJIS", "UTF-8");
+	if(ic==(iconv_t)-1) return std::string(utf8, len);
+	
+	std::vector<char> inbuf(utf8, utf8+len);
+	std::vector<char> outbuf(len*2+4, 0);
+	char *in=inbuf.data();
+	char *out=outbuf.data();
+	size_t in_size=len;
+	size_t out_size=outbuf.size()-1;
+	
+	while(in_size>0)
+	{
+		if(iconv(ic, &in, &in_size, &out, &out_size)==(size_t)-1)
+		{
+			if(in_size==0 || out_size==0) break;
+			++in; --in_size; //skip characters that have no SJIS equivalent
+		}
+	}
+	iconv_close(ic);
+	return std::string(outbuf.data(), out-outbuf.data());
+}

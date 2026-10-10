@@ -1,3 +1,13 @@
+mikumikupenguin (0.2.1+20261010) unstable; urgency=medium
+
+  * Merge upstream v0.2.1 (github.com/weimingtom/MMP, mirror of
+    sn0w75/MikuMikuPenguin): IK angle limits, rigid body fixes, VMD writer.
+  * Re-apply the GLFW 3 / GLM / safety fixes on top of it.
+  * Step animation by wall-clock time.
+  * Run the glm_helper unit test at build time.
+
+ -- shitamo <sitamo@gmail.com>  Sat, 10 Oct 2026 21:10:00 +0900
+
 mikumikupenguin (0.1+20261010.2) unstable; urgency=medium
 
   * Read PMX vertex indices as unsigned (fixes segfault with models that

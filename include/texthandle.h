@@ -11,4 +11,7 @@
 std::string sjisToUTF8(const char *sjis, std::size_t maxLen);
 std::string sjisToUTF8(const char *sjis);
 
+//Convert UTF-8 to Shift_JIS (CP932); used when writing VMD files.
+std::string UTF8ToSJIS(const char *utf8);
+
 #endif

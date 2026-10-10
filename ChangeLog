@@ -1,3 +1,14 @@
+October 10, 2026 (merge of weimingtom/MMP v0.2.1):
+-Rebased the modernisation onto upstream v0.2.1 (IK angle limits, type 2
+ rigid bodies, D3D->OpenGL conversion fixes, VMD writer, more VMD
+ sections, glm_helper + test)
+-Fixed buffer over-reads in the v0.2.1 SJIS/UTF-8 conversion (which also
+ aborted on ASCII-only names) and in the VMD writer
+-Animation/physics now step by wall-clock time (1/60 s) instead of once
+ per rendered frame
+-Dropped the OpenGL 3.0 #version 130 shader rewrite (used tmpnam); OpenGL
+ 3.2 core is required
+
 October 10, 2026:
 -Ported from GLFW 2 to GLFW 3 (GLFW 2 is no longer shipped by distributions)
 -Updated for current GLM (0.9.9 / 1.x): radians everywhere, identity

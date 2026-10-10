@@ -1,4 +1,4 @@
-#version 330 core
+#version 150
 
 uniform sampler2D textureSampler;
 uniform sampler2D sphereSampler;

@@ -1,8 +1,11 @@
 #include "mmdphysics.h"
+#include "pmx.h"
+#include "glm_helper.h"
 
 #include <iostream>
 
 using namespace std;
+using namespace ClosedMMDFormat;
 
 MMDPhysics::MMDPhysics(PMXInfo &pmxInfo, VMDMotionController *motionController, BulletPhysics* bulletPhysics):pmxInfo(pmxInfo),motionController(motionController)
 {
@@ -37,19 +40,9 @@ rotationDecay, physicsOperation == 0, 1 << group, noCollisionGroupFlag));*/
 	//createTestJoint
 }
 
-glm::mat4 MMDPhysics::createRigidMatrix(glm::vec3 &pos, glm::vec3 &rot, int &i)
+glm::mat4 MMDPhysics::createRigidMatrix(const glm::vec3 &pos, const glm::vec3 &rot)
 {
-	glm::vec3 p = glm::vec3(pos);
-	if(i!=-1)
-	{
-		//p += pmxInfo.bones[i]->parent->position; //p += glm::vec3((*bones)[i].initMatML.m[3]); //関連ボーンがある場合は、ボーン相対座標からモデルローカル座標に変換。MmdStruct::PmdRigidBody.pos_posを参照
-		//(*bones)[i].extraBoneControl = true;
-	}
-	glm::mat4 trans, rotation;
-	trans=glm::translate(p); //D3DXMatrixTranslation(&trans, p.x, p.y, p.z);
-	glm::vec3 r=rot;
-	rotation=glm::yawPitchRoll(r.y,r.x,r.z); //D3DXMatrixRotationYawPitchRoll(&rotation, r.y, r.x, r.z);
-	return trans*rotation;
+	return glm::translate(pos)*glm::toMat4(fromEulerAnglesRadians(rot));
 }
 
 vector<glm::vec3> createBox(float width, float height, float depth)
@@ -116,19 +109,17 @@ vector<glm::vec3> createBox(float width, float height, float depth)
 
 void MMDPhysics::createRigidBody()
 {
+	const std::vector<PMXRigidBody*> &rigidBodies=pmxInfo.rigidBodies;
+
 	for(int i=0; i<pmxInfo.rigid_body_continuing_datasets; ++i)
-	{		
-		std::vector<PMXRigidBody*> &rigidBodies=pmxInfo.rigidBodies;
-		
-		glm::mat4 world, world_inv;
-		world = createRigidMatrix(rigidBodies[i]->position, rigidBodies[i]->rotation, rigidBodies[i]->relatedBoneIndex);
-		world_inv = glm::inverse(world);
+	{
+		glm::mat4 world=createRigidMatrix(rigidBodies[i]->position, rigidBodies[i]->rotation);
 		rigidBodies[i]->Init=world;
-		rigidBodies[i]->Offset=world_inv;
-		
+		rigidBodies[i]->Offset=glm::inverse(world);
+
 		if (rigidBodies[i]->shape == RIGID_SHAPE_SPHERE) //球
 		{
-			float radius = rigidBodies[i]->size.x/2;
+			float radius = rigidBodies[i]->size.x;
 			
 			this->rigidBodies.push_back(bulletPhysics->CreateSphere(
 radius, &world, rigidBodies[i]->mass, rigidBodies[i]->elasticity, rigidBodies[i]->friction, rigidBodies[i]->movementDecay,
@@ -153,7 +144,7 @@ rigidBodies[i]->rotationDecay, rigidBodies[i]->physicsOperation == 0, 1 << rigid
 		}
 		else if(rigidBodies[i]->shape == RIGID_SHAPE_CAPSULE) //カプセル
 		{
-			float radius = rigidBodies[i]->size.x/2, height = rigidBodies[i]->size.y/2;
+			float radius = rigidBodies[i]->size.x, height = rigidBodies[i]->size.y;
 			
 			this->rigidBodies.push_back(bulletPhysics->CreateCapsule(
 radius, height, &world, rigidBodies[i]->mass, rigidBodies[i]->elasticity, rigidBodies[i]->friction, rigidBodies[i]->movementDecay,
@@ -185,14 +176,7 @@ void MMDPhysics::createJoints()
 		for (int j =  0; j < 3; ++j) stiffness.push_back(joint->springMovementConstant[j]);
 		for (int j =  0; j < 3; ++j) stiffness.push_back(joint->springRotationConstant[j]);
 		
-		glm::vec3 p(joint->position);
-		glm::vec3 r(joint->rotation);
-		
-		
-		glm::mat4 trans, rotation, world, rot_x, rot_y, rot_z;
-		trans=glm::translate(glm::vec3(p.x, p.y, p.z));
-		rotation=glm::yawPitchRoll(r.y, r.x, r.z);
-		world = trans*rotation;	// ジョイントの行列（モデルローカル座標系）
+		glm::mat4 world = createRigidMatrix(joint->position, joint->rotation);	// ジョイントの行列（モデルローカル座標系）
 		
 		btRigidBody *rigidbody_a,*rigidbody_b;
 		glm::mat4 a,b,frameInA,frameInB;
@@ -228,56 +212,58 @@ void MMDPhysics::createJoints()
 
 void MMDPhysics::updateBones(bool physicsEnabled)
 {
-	for (unsigned int i = 0; i<pmxInfo.rigidBodies.size(); ++i)
-	{		
-		if(pmxInfo.rigidBodies[i]->relatedBoneIndex!=-1 && pmxInfo.rigidBodies[i]->physicsOperation == 0) // ボーン追従タイプの剛体にボーン行列を設定
+	// ボーン追従タイプの剛体にボーン行列を設定
+	for (unsigned int i_rb = 0; i_rb<pmxInfo.rigidBodies.size(); ++i_rb)
+	{
+		// ボーン追従タイプ以外の剛体は飛ばす
+		if (pmxInfo.rigidBodies[i_rb]->relatedBoneIndex == -1 ||
+			pmxInfo.rigidBodies[i_rb]->physicsOperation != RIGID_TYPE_FOLLOWER)
 		{
-	
-			//cout<<"here"<<endl;
-			PMXBone* bone = pmxInfo.bones[pmxInfo.rigidBodies[i]->relatedBoneIndex]; //Bone* bone = &((*bones)[pmxInfo.rigidBodies[i]->relatedBoneIndex[i]]);
-			const glm::mat4 rigidMat = pmxInfo.bones[pmxInfo.rigidBodies[i]->relatedBoneIndex]->calculateGlobalMatrix()*motionController->invBindPose[pmxInfo.rigidBodies[i]->relatedBoneIndex]*pmxInfo.rigidBodies[i]->Init; // ボーンの移動量を剛体の初期姿勢に適用したものが剛体の現在の姿勢			
-			bulletPhysics->MoveRigidBody(rigidBodies[i], &rigidMat);
+			continue;
 		}
+
+		const unsigned int i_bone = pmxInfo.rigidBodies[i_rb]->relatedBoneIndex;
+		PMXBone* bone = pmxInfo.bones[i_bone];
+		// ボーンの移動量を剛体の初期姿勢に適用したものが剛体の現在の姿勢
+		const glm::mat4 rigidMat = pmxInfo.bones[i_bone]->calculateGlobalMatrix()*motionController->invBindPose[i_bone]*pmxInfo.rigidBodies[i_rb]->Init;
+		bulletPhysics->MoveRigidBody(rigidBodies[i_rb], &rigidMat);
 	}
-	
+
 	if(physicsEnabled) bulletPhysics->StepSimulation();
-	
-	for (unsigned int i = 0; i < rigidBodies.size(); ++i)
+
+	// グローバル座標系の剛体位置姿勢をPMXBoneの親リンクからの相対位置姿勢に変換する．
+	// PMXBoneの親子関係を考慮していないので収束ループが必要となりあまり良いコードではない．
+	// Appearance Miku & TDA Mikuでテストし収束ループは２回とした
+	for (int i_it = 0; i_it < 2; ++i_it)
 	{
-		if (pmxInfo.rigidBodies[i]->relatedBoneIndex!=-1 && pmxInfo.rigidBodies[i]->physicsOperation == 2) //ボーン位置あわせタイプの剛体の位置移動量にボーンの位置移動量を設定
+		for (unsigned int i_rb = 0; i_rb < rigidBodies.size(); ++i_rb)
 		{
-			PMXBone* bone = pmxInfo.bones[pmxInfo.rigidBodies[i]->relatedBoneIndex];
-			glm::vec3 v = glm::vec3(bone->calculateGlobalMatrix()[3]) - glm::vec3(glm::inverse(motionController->invBindPose[pmxInfo.rigidBodies[i]->relatedBoneIndex])[3]);	// ボーンの位置移動量
-			glm::vec3 p = glm::vec3(pmxInfo.rigidBodies[i]->Init[3])+v;	//剛体の位置
-			glm::mat4 m = bulletPhysics->GetWorld(rigidBodies[i]);
-			m[3][0] = p.x; m[3][1] = p.y; m[3][2] = p.z; m[3][3]=1.0;
-			
-			
-			
-			bulletPhysics->MoveRigidBody(rigidBodies[i], &m);
+			// ボーン追従タイプの剛体は飛ばす
+			if (pmxInfo.rigidBodies[i_rb]->relatedBoneIndex == -1 ||
+				pmxInfo.rigidBodies[i_rb]->physicsOperation == RIGID_TYPE_FOLLOWER)
+			{
+				continue;
+			}
+
+			const unsigned int i_bone = pmxInfo.rigidBodies[i_rb]->relatedBoneIndex;
+			PMXBone* bone = pmxInfo.bones[i_bone];
+			glm::mat4 parent_global;
+			if (bone->parent)
+			{
+				parent_global = bone->parent->calculateGlobalMatrix();
+			}
+			const glm::mat4 rb_global = bulletPhysics->GetWorld(rigidBodies[i_rb]) * pmxInfo.rigidBodies[i_rb]->Offset;
+			const glm::mat4 rb_local = glm::inverse(parent_global) * rb_global * glm::inverse(motionController->invBindPose[i_bone]);
+
+			if (pmxInfo.rigidBodies[i_rb]->physicsOperation == RIGID_TYPE_PHYSICS)
+			{
+				bone->Local = rb_local;
+			}
+			else if (pmxInfo.rigidBodies[i_rb]->physicsOperation == RIGID_TYPE_PHYSICS_ROT_ONLY)
+			{
+				const glm::quat rotation(rb_local);
+				bone->Local = glm::translate(glm::vec3(bone->Local[3][0], bone->Local[3][1], bone->Local[3][2])) * glm::toMat4(rotation);
+			}
 		}
 	}
-	
-	for (unsigned int i = 0; i < rigidBodies.size(); ++i)
-	{
-		if(pmxInfo.rigidBodies[i]->relatedBoneIndex!=-1)
-		{
-			PMXBone* bone = pmxInfo.bones[pmxInfo.rigidBodies[i]->relatedBoneIndex];
-			//bone->Global = bulletPhysics->GetWorld(rigidBodies[i])*rigidbody_offset[i]*glm::translate(bone->position);
-			//bone->Global = glm::inverse(motionController->invBindPose[pmxInfo.rigidBodies[i]->relatedBoneIndex[i]]);
-			
-			//motionController->skinMatrix[pmxInfo.rigidBodies[i]->relatedBoneIndex] = bone->calculateGlobalMatrix()*motionController->invBindPose[pmxInfo.rigidBodies[i]->relatedBoneIndex];
-			//bone->Local=bulletPhysics->GetWorld(rigidBodies[i])*pmxInfo.rigidBodies[i]->Offset*glm::translate(bone->position);
-			
-			//bone->Local=glm::translate(bone->position);
-			
-			//bone->Local = bone->Local*pmxInfo.rigidBodies[i]->Offset*bulletPhysics->GetWorld(rigidBodies[i]);
-			motionController->skinMatrix[pmxInfo.rigidBodies[i]->relatedBoneIndex]=bulletPhysics->GetWorld(rigidBodies[i])*pmxInfo.rigidBodies[i]->Offset;
-			
-			//motionController->skinMatrix[pmxInfo.rigidBodies[i]->relatedBoneIndex]=bulletPhysics->GetWorld(rigidBodies[i])*pmxInfo.rigidBodies[i]->Offset+glm::translate(bone->position);
-			//motionController->skinMatrix[pmxInfo.rigidBodies[i]->relatedBoneIndex]=bulletPhysics->GetWorld(rigidBodies[i])*pmxInfo.rigidBodies[i]->Offset*glm::translate(bone->position);
-		}
-	}
-	
-	motionController->updateBoneMatrix();
 }

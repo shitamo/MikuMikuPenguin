@@ -74,7 +74,7 @@ GLuint compileShader(GLenum type, const GLchar *filename)
 }
 
 
-GLuint loadShaders(string vertShaderName, string fragShaderName)
+GLuint compileShaders(string vertShaderName, string fragShaderName)
 {
 	GLuint vertShader=compileShader(GL_VERTEX_SHADER,vertShaderName.c_str());
 	GLuint fragShader=compileShader(GL_FRAGMENT_SHADER,fragShaderName.c_str());
@@ -83,6 +83,11 @@ GLuint loadShaders(string vertShaderName, string fragShaderName)
 	glAttachShader(program,vertShader);
 	glAttachShader(program,fragShader);
 	
+	return program;
+}
+
+void linkShaders(GLuint program)
+{
 	cout<<"Linking shaders...";
 	glLinkProgram(program);
 	
@@ -101,9 +106,4 @@ GLuint loadShaders(string vertShaderName, string fragShaderName)
 	}
 	
 	cout<<"done"<<endl;
-	
-	
-	//glUseProgram(program);
-	
-	return program;
 }

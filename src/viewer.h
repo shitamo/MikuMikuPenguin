@@ -9,8 +9,8 @@
 
 #define BUFFER_OFFSET(offset) ((void *) (offset))
 
-enum VAO_IDs { Vertices, IKDebugVertices, RigidDebugVertices, NumVAOs };
-enum Buffer_IDs { VertexArrayBuffer, VertexIndexBuffer, IKVertexArrayBuffer, RecordBuffer, NumBuffers };
+enum VAO_IDs { Vertices, NumVAOs };
+enum Buffer_IDs { VertexArrayBuffer, VertexIndexBuffer, RecordBuffer, NumBuffers };
 enum Attrib_IDs { vPosition, vUV, vNormal, vBoneIndices, vBoneWeights, vWeightFormula };
 enum Uniform_IDs { 
 	uAmbient,uDiffuse,uSpecular,uShininess,
@@ -20,8 +20,11 @@ enum Uniform_IDs {
 	uTextureSampler,uSphereSampler,uToonSampler,
 	NumUniforms };
 
-struct PMXInfo;
-struct VMDInfo;
+namespace ClosedMMDFormat
+{
+	struct PMXInfo;
+	struct VMDInfo;
+}
 class VMDMotionController;
 class BulletPhysics;
 class MMDPhysics;
@@ -39,6 +42,7 @@ class Viewer
 	
 	private:
 	void initGLFW();
+	void hackShaderFiles(); //modify #version lines in shader files to match GL version
 	void initUniformVarLocations();
 	void loadTextures();
 	void initBuffers();
@@ -46,13 +50,13 @@ class Viewer
 	void handleEvents();
 	void handleLogic();
 	void render();
+	void fpsCount();
 	
 	void setCamera(GLuint MVPLoc);
 	bool keyPressed(int key);
 	void holdModelInBindPose();
 	
 	void drawModel(bool drawEdges);
-	void drawIKMarkers();
 	
 	
 	GLFWwindow *window;
@@ -64,8 +68,8 @@ class Viewer
 
 	GLuint MVP_loc;
 
-	PMXInfo *pmxInfo;
-	VMDInfo *vmdInfo;
+	ClosedMMDFormat::PMXInfo *pmxInfo;
+	ClosedMMDFormat::VMDInfo *vmdInfo;
 	VMDMotionController *motionController;
 
 	BulletPhysics *bulletPhysics;
@@ -75,11 +79,14 @@ class Viewer
 	GLuint whiteTexture; //bound when a material has no texture
 	GLuint textureOrWhite(int index);
 	
+	//The OpenGL Version hints used that successfully opened the window
+	int GLVersionHintMajor,GLVersionHintMinor;
+	//The actual OpenGL Version recieved
+	int GLVersionMajor,GLVersionMinor,GLVersionRevision;
+	
+	std::string vertShaderPath,fragShaderPath;
 	GLuint shaderProgram;
-	
-	VertexData *IKVertexData;
-	VertexData *RigidVertexData;
-	
+	std::string bulletVertPath,bulletFragPath;
 	
 	//***Timing Variables
 	double startTime;

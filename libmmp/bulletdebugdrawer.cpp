@@ -9,12 +9,9 @@ using namespace std;
 
 #define BUFFER_OFFSET(offset) ((void *) (offset))
 
-DebugDrawer::DebugDrawer(GLuint shaderProgram): m_debugMode(0)
+BulletDebugDrawer::BulletDebugDrawer(string vertexShaderPath, string fragmentShaderPath): m_debugMode(0)
 {
-	this->shaderProgram=shaderProgram;
-	glUseProgram(shaderProgram);
-	
-	MVPLoc = glGetUniformLocation(shaderProgram, "MVP");
+	shaderProgram=compileShaders(vertexShaderPath,fragmentShaderPath);
 	
 	glGenVertexArrays(1,&VAO);
 	glBindVertexArray(VAO);
@@ -24,14 +21,21 @@ DebugDrawer::DebugDrawer(GLuint shaderProgram): m_debugMode(0)
 	
 	//0-vPosition
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)*8, BUFFER_OFFSET(0));
+	glBindAttribLocation(shaderProgram, 0, "vPosition"); //Explicit vertex attribute index specification for older OpenGL version support. (Newer method is layout qualifier in vertex shader)
 	glEnableVertexAttribArray(0);
 	
 	//1-vColor
 	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)*8, BUFFER_OFFSET(sizeof(GLfloat)*4));
+	glBindAttribLocation(shaderProgram, 1, "vColor");
 	glEnableVertexAttribArray(1);
+	
+	linkShaders(shaderProgram);
+	glUseProgram(shaderProgram);
+	
+	MVPLoc = glGetUniformLocation(shaderProgram, "MVP");
 }
 
-void DebugDrawer::drawLine(const btVector3 &from, const btVector3 &to, const btVector3 &color)
+void BulletDebugDrawer::drawLine(const btVector3 &from, const btVector3 &to, const btVector3 &color)
 {
 	lines.push_back(glm::vec4(from.getX(),from.getY(),from.getZ(),1.f));
 	lines.push_back(glm::vec4(to.getX(),to.getY(),to.getZ(),1.f));
@@ -40,7 +44,7 @@ void DebugDrawer::drawLine(const btVector3 &from, const btVector3 &to, const btV
 	lineColors.push_back(glm::vec4(color.getX(),color.getY(),color.getZ(),1.f));
 }
 
-void DebugDrawer::render()
+void BulletDebugDrawer::render()
 {	
 	glUseProgram(shaderProgram);
 	glPointSize(5.0f);
@@ -73,25 +77,24 @@ void DebugDrawer::render()
 	btDebugVertices.clear();
 }
 
-void DebugDrawer::drawContactPoint(const btVector3 &PointOnB, const btVector3 &normalOnB, btScalar distance, int lifeTime, const btVector3 &color)
+void BulletDebugDrawer::drawContactPoint(const btVector3 &PointOnB, const btVector3 &normalOnB, btScalar distance, int lifeTime, const btVector3 &color)
+{
+}
+void BulletDebugDrawer::draw3dText(const btVector3 &location, const char *textString)
 {
 }
 
-void DebugDrawer::reportErrorWarning (const char *warningString)
+void BulletDebugDrawer::reportErrorWarning (const char *warningString)
 {
 	cout<<warningString<<endl;
 }
 
-void DebugDrawer::draw3dText(const btVector3 &location, const char *textString)
-{
-}
-
-void DebugDrawer::setDebugMode (int debugMode)
+void BulletDebugDrawer::setDebugMode (int debugMode)
 {
 	m_debugMode = debugMode;
 }
 
-int DebugDrawer::getDebugMode() const
+int BulletDebugDrawer::getDebugMode() const
 {
 	return m_debugMode;
 }

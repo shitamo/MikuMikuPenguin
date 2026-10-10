@@ -1,6 +1,7 @@
 bin_PROGRAMS = pmx
 
-pmx_SOURCES = main.cpp pmxvLogger.cpp viewer.cpp viewer.h pmxvLogger.h sound.h
+pmx_SOURCES = main.cpp pmxvLogger.cpp viewer.cpp viewer.h pmxvLogger.h sound.h \
+	glfw_func_callbacks.cpp glfw_func_callbacks.h
 pmx_CPPFLAGS = -DDATA_PATH=\"$(pkgdatadir)\" -I$(top_srcdir)/include \
 	$(GLFW_CFLAGS) $(GLEW_CFLAGS) $(GL_CFLAGS) $(BULLET_CFLAGS)
 pmx_CXXFLAGS = $(MMP_CXXSTD) $(AM_CXXFLAGS)

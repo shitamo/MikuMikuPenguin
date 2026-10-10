@@ -47,7 +47,7 @@ void printHelpInfo()
 
 void printVersionInfo()
 {
-	cout<<"PMXViewer v0.1"<<endl
+	cout<<"PMXViewer v0.2.1"<<endl
 	<<"Copyright (C) 2014 Ben Clapp (sn0w75)"<<endl
      <<"This is free software; see the source for copying conditions.  There is NO"<<endl
      <<"warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."<<endl
@@ -115,7 +115,7 @@ int main(int argc, char** argv)
 		printHelpInfo();
 		return 0;
 	}
-	
+	cout<<"sizeinfo: "<<sizeof(VertexData)<<" "<<sizeof(GLfloat)<<" "<<sizeof(glm::vec2)<<endl;
 	
 	Viewer viewer(model_file,motion_file,music_file);
 	

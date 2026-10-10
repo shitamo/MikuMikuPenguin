@@ -34,6 +34,7 @@
 //#define MODELDUMP true
 
 using namespace std;
+using namespace ClosedMMDFormat;
 
 
 Viewer::Viewer(string modelPath, string motionPath,string musicPath)
@@ -57,30 +58,41 @@ Viewer::Viewer(string modelPath, string motionPath,string musicPath)
 	//pmxInfo=&readPMX("data/model/gumiv3/","GUMI_V3.pmx");
 	//vmdInfo=&readVMD("data/motion/Watashi no Jikan/私の時間_short_Lat式ミク.vmd");
 	
+	//Below is a test for VMD file-writing. Write the current vmdInfo object to a file, then read back the output into a new vmdInfo object
+	//writeVMD(*vmdInfo,"testVMD.vmd");
+	//vmdInfo=&readVMD("testVMD.vmd");
+	
 	initGLFW();
 	
-	ifstream test("shaders/model.vert");
+	
+	//NOTE: shaderProgram compilation now handled in hackShaderFiles() within initGLFW()
+	/*ifstream test("shaders/model.vert");
 	if(!test.is_open())
 	{
-		shaderProgram=loadShaders(DATA_PATH"/shaders/model.vert",DATA_PATH"/shaders/model.frag");
+		shaderProgram=compileShaders(DATA_PATH"/shaders/model.vert",DATA_PATH"/shaders/model.frag");
 	}
 	else
 	{
-		shaderProgram=loadShaders("shaders/model.vert","shaders/model.frag");
+		shaderProgram=compileShaders("shaders/model.vert","shaders/model.frag");
 	}
-	test.close();
+	test.close();*/
 	
 	
 	
-	glUseProgram(shaderProgram);
 	loadTextures();
+
+	
 	initBuffers();
+	linkShaders(shaderProgram);
+	glUseProgram(shaderProgram);
+	
+
 	initUniformVarLocations();
 	
 	MVP_loc = glGetUniformLocation(shaderProgram, "MVP");
     
 	//Set OpenGL render settings
-    glDisable(GL_CULL_FACE);
+	glDisable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -96,22 +108,10 @@ Viewer::Viewer(string modelPath, string motionPath,string musicPath)
 	motionController=new VMDMotionController(*pmxInfo,*vmdInfo,shaderProgram);
 	
 	
-	ifstream test2("shaders/bulletDebug.vert");
-	GLuint btDebugShaderProgram;
-	if(!test2.is_open())
-	{
-		btDebugShaderProgram=loadShaders(DATA_PATH"/shaders/bulletDebug.vert",DATA_PATH"/shaders/bulletDebug.frag");
-	}
-	else
-	{
-		btDebugShaderProgram=loadShaders("shaders/bulletDebug.vert","shaders/bulletDebug.frag");
-	}
-	//GLuint btDebugShaderProgram=loadShaders(DATA_PATH"/shaders/bulletDebug.vert",DATA_PATH"/shaders/bulletDebug.frag");
-	
 	initSound(musicPath);
 	
-	bulletPhysics = new BulletPhysics(btDebugShaderProgram);
-	glUseProgram(shaderProgram); //restore GL shader program to Viewer's shader program after initializing BulletPhysic's debugDrawer
+	bulletPhysics = new BulletPhysics(bulletVertPath,bulletFragPath);
+	glUseProgram(shaderProgram); //restore GL shader program binding to Viewer's shader program after initializing BulletPhysic's debugDrawer
 	mmdPhysics = new MMDPhysics(*pmxInfo,motionController,bulletPhysics);
 	
 	motionController->updateVertexMorphs();
@@ -134,14 +134,16 @@ void Viewer::handleLogic()
 	
 	//if(!keyPressed(GLFW_KEY_A))
 	{
-		motionController->advanceTime();
-		
+		if (!motionController->advanceTime())
+		{
+			motionController->updateVertexMorphs();
+			motionController->updateBoneAnimation();
+		}
 		//Debug- hold model in bind pose
 		//holdModelInBindPose();
 		
-		motionController->updateVertexMorphs();
-		motionController->updateBoneAnimation();
 		mmdPhysics->updateBones(doPhysics);
+		motionController->updateBoneMatrix();
 		
 		glUseProgram(bulletPhysics->debugDrawer->shaderProgram);
 		setCamera(bulletPhysics->debugDrawer->MVPLoc);
@@ -160,22 +162,22 @@ void Viewer::render()
 	
 	if(keyPressed(GLFW_KEY_S))
 	{
-		bulletPhysics->setDebugMode(btIDebugDraw::DBG_DrawWireframe);
+		bulletPhysics->SetDebugMode(btIDebugDraw::DBG_DrawWireframe);
 		bulletPhysics->DebugDrawWorld();
 	}
 	else if(keyPressed(GLFW_KEY_D))
 	{
-		bulletPhysics->setDebugMode(btIDebugDraw::DBG_DrawAabb);
+		bulletPhysics->SetDebugMode(btIDebugDraw::DBG_DrawAabb);
 		bulletPhysics->DebugDrawWorld();
 	}
 	else if(keyPressed(GLFW_KEY_F))
 	{
-		bulletPhysics->setDebugMode(btIDebugDraw::DBG_DrawConstraints);
+		bulletPhysics->SetDebugMode(btIDebugDraw::DBG_DrawConstraints);
 		bulletPhysics->DebugDrawWorld();
 	}
 	else if(keyPressed(GLFW_KEY_G))
 	{
-		bulletPhysics->setDebugMode(btIDebugDraw::DBG_DrawConstraintLimits);
+		bulletPhysics->SetDebugMode(btIDebugDraw::DBG_DrawConstraintLimits);
 		bulletPhysics->DebugDrawWorld();
 	}
 	glUseProgram(shaderProgram); //Restore shader program and buffer's to Viewer's after drawing Bullet debug
@@ -183,24 +185,79 @@ void Viewer::render()
 	glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[VertexIndexBuffer]);
 	
-	//drawIKMarkers();
-
 	//glFinish();
 	//glDrawBuffer(RecordBuffer,Buffers);
 	//glReadPixels(0,0,1920,1080,GL_RGB,
 }
 
+void Viewer::fpsCount()
+{
+	static double last_time;
+	static int nb_frames[] = {0,0,0,0};
+	static const int nbf_fps = sizeof(nb_frames) / sizeof(int);
+	static const double seq = 1.0 / double(nbf_fps);
+	static int nbf_count = 0;
+	static const char* window_name = "PMX Viewer";
+	if (!last_time) last_time = glfwGetTime();
+	
+	double current_time = glfwGetTime();
+	for (int i = 0; i < nbf_fps; i++)
+	{
+		nb_frames[i]++;
+	}
+
+	if (current_time - last_time >= seq)
+	{
+		int nbf_now = nbf_count % nbf_fps;
+		char title[128];
+		sprintf(title, "%s | %2d fps", window_name, nb_frames[nbf_now]);
+		glfwSetWindowTitle(window, title);
+		nb_frames[nbf_now] = 0;
+		last_time += seq;
+		nbf_count++;
+	}
+}
+
 void Viewer::run()
 {
+	//The animation and the physics advance in fixed 1/60 s steps.  Step them
+	//according to the elapsed wall-clock time so that playback speed does
+	//not depend on the monitor refresh rate (e.g. 120/144 Hz with vsync) or
+	//on a slow renderer.
+	static const double STEP=1.0/60.0;
+	static const int MAX_STEPS_PER_FRAME=4;
+	double lastTime=glfwGetTime();
+	double accumulator=STEP; //run one logic step before the first frame
+	
 	while(!keyPressed(GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(window))
 	{
 		glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
 		glViewport(0, 0, framebufferWidth, framebufferHeight);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		startTime = glfwGetTime();
 		
+		double now=glfwGetTime();
+		accumulator+=now-lastTime;
+		lastTime=now;
+		startTime=now;
+		
+		fpsCount();
 		handleEvents();
-		handleLogic();
+		
+		int steps=0;
+		while(accumulator>=STEP && steps<MAX_STEPS_PER_FRAME)
+		{
+			handleLogic();
+			accumulator-=STEP;
+			++steps;
+		}
+		if(steps==MAX_STEPS_PER_FRAME) accumulator=0.0; //too slow to keep up: drop time instead of spiralling
+		if(steps==0) //still update the camera so mouse movement stays smooth
+		{
+			glUseProgram(bulletPhysics->debugDrawer->shaderProgram);
+			setCamera(bulletPhysics->debugDrawer->MVPLoc);
+			glUseProgram(shaderProgram);
+			setCamera(MVP_loc);
+		}
 		render();
 		
 		glfwSwapBuffers(window);
@@ -255,10 +312,8 @@ void Viewer::drawModel(bool drawEdges)
 	
 	glm::vec3 halfVector=glm::normalize(cameraPosition-cameraTarget);
 	halfVector.z=-halfVector.z;
-	GLuint halfVectorLoc=glGetUniformLocation(shaderProgram, "halfVector");
 	
 	glm::vec3 lightDirection=glm::normalize(glm::vec3(0.3,1.0,2.0));
-	GLuint lightDirectionLoc=glGetUniformLocation(shaderProgram, "lightDirection");
 	
 	int faceCount=0;
 	for(int m=0; m<pmxInfo->material_continuing_datasets; ++m) //pmxInfo->material_continuing_datasets
@@ -302,83 +357,11 @@ void Viewer::drawModel(bool drawEdges)
 		glUniform4fv(uniformVars[uEdgeColor],1,(GLfloat*)&pmxInfo->materials[m]->edgeColor);
 		glUniform1f(uniformVars[uEdgeSize],mmp::scalarNormalize(pmxInfo->materials[m]->edgeSize));
 		
-		glUniform1f(uniformVars[uSphereMode],mmp::scalarNormalize(pmxInfo->materials[m]->sphereMode));
+		glUniform1f(uniformVars[uSphereMode],pmxInfo->materials[m]->sphereMode);
         
 		glDrawElements(GL_TRIANGLES, (pmxInfo->materials[m]->hasFaceNum), GL_UNSIGNED_INT, BUFFER_OFFSET(sizeof(GLuint)*faceCount));
 		faceCount+=pmxInfo->materials[m]->hasFaceNum;
 	}
-}
-
-void Viewer::drawIKMarkers()
-{
-	glBindVertexArray(VAOs[IKDebugVertices]);
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[IKVertexArrayBuffer]);
-	
-	
-	vector<int> targetBoneIndices;
-	
-	for(int i=0; i<pmxInfo->bone_continuing_datasets; ++i)
-	{
-		PMXBone *b=pmxInfo->bones[i];
-	
-		glm::mat4 tmpMatrix=b->calculateGlobalMatrix();
-		IKVertexData[i].position.x=tmpMatrix[3][0];
-		IKVertexData[i].position.y=tmpMatrix[3][1];
-		IKVertexData[i].position.z=tmpMatrix[3][2];
-		IKVertexData[i].position.w=tmpMatrix[3][3];
-		
-		//IKVertexData[i].position.x=b->Global[3][0];
-		//IKVertexData[i].position.y=b->Global[3][1];
-		//IKVertexData[i].position.z=b->Global[3][2];
-		//IKVertexData[i].position.w=b->Global[3][3];
-
-		IKVertexData[i].UV.x=0;
-		IKVertexData[i].UV.y=0;
-		
-		if(b->IK)
-		{
-			targetBoneIndices.push_back(b->IKTargetBoneIndex);
-			
-			IKVertexData[i].normal.x=1;
-			IKVertexData[i].normal.y=0;
-			IKVertexData[i].normal.z=0;
-		}
-		else
-		{
-			IKVertexData[i].normal.x=0;
-			IKVertexData[i].normal.y=0;
-			IKVertexData[i].normal.z=0;
-		}
-
-		IKVertexData[i].weightFormula=4;
-
-		IKVertexData[i].boneIndex1=0;
-		IKVertexData[i].boneIndex2=0;
-		IKVertexData[i].boneIndex3=0;
-		IKVertexData[i].boneIndex4=0;
-
-		IKVertexData[i].weight1=0;
-		IKVertexData[i].weight2=0;
-		IKVertexData[i].weight3=0;
-		IKVertexData[i].weight4=0;
-		
-	}
-	
-	for(int i=0; i<targetBoneIndices.size(); ++i)
-	{
-		IKVertexData[ targetBoneIndices[i] ].normal.x=0;
-		IKVertexData[ targetBoneIndices[i] ].normal.y=1;
-		IKVertexData[ targetBoneIndices[i] ].normal.z=0;
-	}
-	
-	glBufferData(GL_ARRAY_BUFFER, pmxInfo->bone_continuing_datasets*sizeof(VertexData), IKVertexData, GL_DYNAMIC_DRAW);
-	
-	GLuint Bones_loc=glGetUniformLocation(shaderProgram,"Bones");
-	glm::mat4 tmpSkinMatrix[pmxInfo->bone_continuing_datasets];
-	
-	glUniformMatrix4fv(Bones_loc, pmxInfo->bone_continuing_datasets, GL_FALSE, (const GLfloat*)&tmpSkinMatrix);
-	
-	glDrawArrays(GL_POINTS, 0, pmxInfo->bone_continuing_datasets);
 }
 
 
@@ -432,47 +415,27 @@ void Viewer::initBuffers()
 	
 	//Intialize Vertex Attribute Pointers
 	glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(0)); //4=number of components updated per vertex
+	glBindAttribLocation(shaderProgram, vPosition, "vPosition"); //Explicit vertex attribute index specification for older OpenGL version support. (Newer method is layout qualifier in vertex shader)
 	glEnableVertexAttribArray(vPosition);
-	
-	glVertexAttribPointer(vUV, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*4));
-	glEnableVertexAttribArray(vUV);
-	
-	glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*6));
-	glEnableVertexAttribArray(vNormal);
-	
-	glVertexAttribPointer(vBoneIndices, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*10));
-	glEnableVertexAttribArray(vBoneIndices);
-	
-	glVertexAttribPointer(vBoneWeights, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*14));
-	glEnableVertexAttribArray(vBoneWeights);
-	
-	glVertexAttribPointer(vWeightFormula, 1, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*9));
-	glEnableVertexAttribArray(vWeightFormula);	
-	
-	
-	//Initialize IK Debug buffers
-	IKVertexData = (VertexData*)malloc(pmxInfo->bone_continuing_datasets*sizeof(VertexData));
 
-	glBindVertexArray(VAOs[IKDebugVertices]);
-	
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[IKVertexArrayBuffer]);
-	
-	glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(0)); //4=number of components updated per vertex
-	glEnableVertexAttribArray(vPosition);
-	
-	glVertexAttribPointer(vUV, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*4));
+	glVertexAttribPointer(vUV, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(glm::vec4)));
+	glBindAttribLocation(shaderProgram, vUV, "vUV");
 	glEnableVertexAttribArray(vUV);
-	
-	glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*6));
+
+	glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(glm::vec4)+sizeof(glm::vec2)));
+	glBindAttribLocation(shaderProgram, vNormal, "vNormal");
 	glEnableVertexAttribArray(vNormal);
-	
-	glVertexAttribPointer(vBoneIndices, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*10));
+
+	glVertexAttribPointer(vBoneIndices, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(glm::vec4)+sizeof(glm::vec2)+sizeof(glm::vec3)+sizeof(GLfloat)));
+	glBindAttribLocation(shaderProgram, vBoneIndices, "vBoneIndices");
 	glEnableVertexAttribArray(vBoneIndices);
-	
-	glVertexAttribPointer(vBoneWeights, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*14));
+
+	glVertexAttribPointer(vBoneWeights, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(glm::vec4)+sizeof(glm::vec2)+sizeof(glm::vec3)+sizeof(GLfloat)*5));
+	glBindAttribLocation(shaderProgram, vBoneWeights, "vBoneWeights");
 	glEnableVertexAttribArray(vBoneWeights);
-	
-	glVertexAttribPointer(vWeightFormula, 1, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*9));
+
+	glVertexAttribPointer(vWeightFormula, 1, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(glm::vec4)+sizeof(glm::vec2)+sizeof(glm::vec3)));
+	glBindAttribLocation(shaderProgram, vWeightFormula, "vWeightFormula");
 	glEnableVertexAttribArray(vWeightFormula);
 }
 
@@ -599,6 +562,34 @@ void Viewer::loadTextures()
 }
 
 
+//Load the shader files (a "shaders/" directory in the current directory
+//takes precedence over the installed copies).
+void Viewer::hackShaderFiles()
+{
+	ifstream test("shaders/model.vert");
+	if(!test.is_open())
+	{
+		shaderProgram=compileShaders(DATA_PATH"/shaders/model.vert",DATA_PATH"/shaders/model.frag");
+	}
+	else
+	{
+		shaderProgram=compileShaders("shaders/model.vert","shaders/model.frag");
+	}
+	test.close();
+	
+	ifstream test2("shaders/bulletDebug.vert");
+	if(!test2.is_open())
+	{
+		bulletVertPath=DATA_PATH"/shaders/bulletDebug.vert";
+		bulletFragPath=DATA_PATH"/shaders/bulletDebug.frag";
+	}
+	else
+	{
+		bulletVertPath="shaders/bulletDebug.vert";
+		bulletFragPath="shaders/bulletDebug.frag";
+	}
+}
+
 static void glfwErrorCallback(int error, const char *description)
 {
 	cerr<<"GLFW error "<<error<<": "<<description<<endl;
@@ -610,8 +601,8 @@ void Viewer::initGLFW()
 	if (!glfwInit()) exit(EXIT_FAILURE);
 	
 	glfwWindowHint(GLFW_SAMPLES, 4); //4x antialiasing
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); //OpenGL 3.3 core is enough for the shaders
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); //OpenGL 3.2 core (GLSL 1.50) is enough for the shaders
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //Don't want old OpenGL
 	glfwWindowHint(GLFW_DEPTH_BITS, 32);
@@ -626,7 +617,7 @@ void Viewer::initGLFW()
 	}
 	if(!window)
 	{
-		fprintf( stderr, "Failed to open GLFW window (OpenGL 3.3 core profile required)\n" );
+		fprintf( stderr, "Failed to open GLFW window (OpenGL 3.2 core profile required)\n" );
 		glfwTerminate();
 		exit(EXIT_FAILURE);
 	}
@@ -654,6 +645,15 @@ void Viewer::initGLFW()
 	
 	glfwSetCursorPosCallback(window, mouseMotion);
 	glfwSetScrollCallback(window, mouseWheel);
+	
+	GLVersionMajor=glfwGetWindowAttrib(window, GLFW_CONTEXT_VERSION_MAJOR);
+	GLVersionMinor=glfwGetWindowAttrib(window, GLFW_CONTEXT_VERSION_MINOR);
+	GLVersionRevision=glfwGetWindowAttrib(window, GLFW_CONTEXT_REVISION);
+	GLVersionHintMajor=3; GLVersionHintMinor=2;
+	cout<<"OpenGL version info: "<<glGetString(GL_VERSION)<<endl;
+	cout<<"GLSL version info: "<<glGetString(GL_SHADING_LANGUAGE_VERSION)<<endl<<endl;
+	
+	hackShaderFiles();
 }
 
 bool Viewer::keyPressed(int key)

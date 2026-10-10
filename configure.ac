@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([MikuMikuPenguin], [0.1], [ibenrunnin@gmail.com])
+AC_INIT([MikuMikuPenguin], [0.2.1], [ibenrunnin@gmail.com])
 AC_CONFIG_SRCDIR([libmmp/pmx.cpp])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -67,7 +67,8 @@ AC_CONFIG_FILES([Makefile
                  libmmp/Makefile
                  doc/Makefile
                  man/Makefile
-                 scripts/Makefile])
+                 scripts/Makefile
+                 test/Makefile])
 
 AC_OUTPUT
 

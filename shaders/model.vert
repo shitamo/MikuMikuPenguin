@@ -1,13 +1,14 @@
-#version 330 core
+#version 150
 
 //Vertex Properties
-layout(location = 0) in vec4 vPosition;
-layout(location = 1) in vec2 vUV;
-layout(location = 2) in vec3 vNormal;
+//layout(location = #) if version is 330 or greater
+in vec4 vPosition;
+in vec2 vUV;
+in vec3 vNormal;
 
-layout(location = 3) in vec4 vBoneIndices;
-layout(location = 4) in vec4 vBoneWeights;
-layout(location = 5) in float vWeightFormula;
+in vec4 vBoneIndices;
+in vec4 vBoneWeights;
+in float vWeightFormula;
 
 out vec2 UV;
 out vec3 normal;

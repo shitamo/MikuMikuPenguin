@@ -12,7 +12,6 @@
 #include "mmdphysics.h"
 
 #include "texthandle.h"
-#include "Converter.h"
 #include "shader.h"
 #include "glfw_func_callbacks.h"
 
