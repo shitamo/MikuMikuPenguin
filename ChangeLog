@@ -14,6 +14,9 @@ October 10, 2026:
 -Bone matrices are passed through a texture buffer instead of a
  uniform array limited to 254 bones (models with more bones showed
  spikes and garbage polygons, e.g. around skirts)
+-PMX vertex indices of size 1/2 are now read as unsigned; models with
+ more than 32767 vertices crashed in vertex morphs (segfault)
+-Guard keyframe interpolation against duplicate keys
 
 January 12, 2014:
 -removed model data file from git repo history

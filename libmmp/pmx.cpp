@@ -122,6 +122,31 @@ using namespace std;
 	}
 }*/
 
+//Vertex indices are UNSIGNED for 1 and 2 byte sizes (PMX 2.0 spec), unlike
+//the other index types.  Reading them as signed broke models with more than
+//32767 vertices (negative morph vertex indices -> out-of-bounds writes).
+void getPMXVertexIndex(ifstream &miku, int &index, uint8_t &indexSize)
+{
+	if(indexSize==1)
+	{
+		uint8_t tmpIndex=0;
+		miku.read((char*)&tmpIndex,1);
+		index=(int)tmpIndex;
+	}
+	else if(indexSize==2)
+	{
+		uint16_t tmpIndex=0;
+		miku.read((char*)&tmpIndex,2);
+		index=(int)tmpIndex;
+	}
+	else
+	{
+		int32_t tmpIndex=0;
+		miku.read((char*)&tmpIndex,4);
+		index=(int)tmpIndex;
+	}
+}
+
 void getPMXIndex(ifstream &miku, int &index, uint8_t &indexSize)
 {
 	//TODO: Apply this method of setting the index to the rest of the file-reading code (make a function)
@@ -718,7 +743,7 @@ PMXInfo &readPMX(string foldername,string filename)
 				case MORPH_TYPE_VERTEX:
 				{
 					PMXVertexMorph *vertexMorph=new PMXVertexMorph();
-					getPMXIndex(miku, vertexMorph->vertexIndex,pmxInfo.vertexIndexSize);
+					getPMXVertexIndex(miku, vertexMorph->vertexIndex,pmxInfo.vertexIndexSize);
 				
 					miku.read((char*)&vertexMorph->coordinateOffset.x,4);
 					miku.read((char*)&vertexMorph->coordinateOffset.y,4);
@@ -741,7 +766,7 @@ PMXInfo &readPMX(string foldername,string filename)
 				{
 					PMXUVMorph *UVMorph=new PMXUVMorph();
 				
-					getPMXIndex(miku, UVMorph->vertexIndex,pmxInfo.vertexIndexSize);
+					getPMXVertexIndex(miku, UVMorph->vertexIndex,pmxInfo.vertexIndexSize);
 				
 					miku.read((char*)&UVMorph->UVOffsetAmount.x,4);
 					miku.read((char*)&UVMorph->UVOffsetAmount.y,4);

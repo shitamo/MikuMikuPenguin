@@ -1,3 +1,11 @@
+mikumikupenguin (0.1+20261010.2) unstable; urgency=medium
+
+  * Read PMX vertex indices as unsigned (fixes segfault with models that
+    have more than 32767 vertices, e.g. in vertex morphs).
+  * Guard keyframe interpolation against duplicate keyframes.
+
+ -- shitamo <sitamo@gmail.com>  Sat, 10 Oct 2026 20:40:00 +0900
+
 mikumikupenguin (0.1+20261010.1) unstable; urgency=medium
 
   * Pass bone matrices through a texture buffer object; models with more

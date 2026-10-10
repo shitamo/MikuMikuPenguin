@@ -189,7 +189,8 @@ void VMDMotionController::updateVertexMorphs()
 					t1 = (*ite_morphKeyFrames[i]).frame*2;
 					val1 = (*ite_morphKeyFrames[i]).value;
 				
-					float s = (float)(time - t0)/(float)(t1 - t0);	//Linear Interpolation
+					float s = (t1>t0) ? ((float)time - (float)t0)/(float)(t1 - t0) : 1.0f;	//Linear Interpolation
+					s = glm::clamp(s, 0.0f, 1.0f);
 					
 					
 					//ipolValue=val0 + (val1 - val0)*s;
@@ -204,6 +205,7 @@ void VMDMotionController::updateVertexMorphs()
 			for(int j=0; j<morph->morphOffsetNum; ++j)
 			{
 				PMXVertexMorph *vMorph=(PMXVertexMorph*) morph->offsetData[j];
+				if(vMorph->vertexIndex<0 || vMorph->vertexIndex>=pmxInfo.vertex_continuing_datasets) continue;
 				glm::vec3 &morphTarget=vMorph->coordinateOffset;
 				
 				glm::vec3 diffVector=morphTarget;
@@ -269,7 +271,9 @@ void VMDMotionController::updateBoneAnimation()
 				
 				//float s = (float)(time - t0)/(float)(t1 - t0);	//Linear Interpolation
 				//cout<<"Bezier: "<<bezier((float)(time - t0)/(float)(t1 - t0), bez.X1.x,bez.X1.y, bez.X2.x,bez.X2.y)<<endl;
-				float T=(float)(time - t0)/(float)(t1 - t0);
+				//guard against duplicate keyframes (t1==t0) and time before the first key
+				float T = (t1>t0) ? ((float)time - (float)t0)/(float)(t1 - t0) : 1.0f;
+				T = glm::clamp(T, 0.0f, 1.0f);
 				float s=0.0f;
 				
 				//bonePos[i]=p0 + (p1 - p0)*T;
