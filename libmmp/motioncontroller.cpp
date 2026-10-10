@@ -312,6 +312,81 @@ void VMDMotionController::updateBoneAnimation()
 	}
 
 	updateIK();
+	updateInheritance();
+}
+
+//Raise a rotation to a (possibly negative or fractional) power:
+//rate 1 = same rotation, -1 = inverse, 0.5 = half way.
+static glm::quat scaleRotation(const glm::quat &q, float rate)
+{
+	glm::quat n=glm::normalize(q);
+	if(n.w<0.0f) n=-n; //shortest path
+	float w=glm::clamp(n.w, -1.0f, 1.0f);
+	float angle=2.0f*acosf(w);
+	float s=sqrtf(glm::max(0.0f, 1.0f-w*w));
+	if(s<1.0e-6f || angle<1.0e-6f) return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+	glm::vec3 axis(n.x/s, n.y/s, n.z/s);
+	return glm::angleAxis(angle*rate, axis);
+}
+
+//Local rotation part of a bone's Local matrix (animation + IK [+ inheritance])
+static glm::quat localRotation(const PMXBone *b)
+{
+	return glm::normalize(glm::quat_cast(glm::mat3(b->Local)));
+}
+
+//Animated translation of a bone (Local translation minus its rest offset)
+static glm::vec3 localTranslation(const PMXBone *b)
+{
+	glm::vec3 rest = b->parent ? (b->position - b->parent->position) : b->position;
+	return glm::vec3(b->Local[3]) - rest;
+}
+
+void VMDMotionController::updateInheritance()
+{
+	//0 = not processed, 1 = in progress (cycle guard), 2 = done
+	std::vector<char> state(pmxInfo.bone_continuing_datasets, 0);
+	for(int i=0; i<pmxInfo.bone_continuing_datasets; ++i)
+	{
+		applyInheritance(i, state);
+	}
+}
+
+void VMDMotionController::applyInheritance(int i, std::vector<char> &state)
+{
+	if(state[i]!=0) return;
+	state[i]=1;
+	
+	PMXBone *b=pmxInfo.bones[i];
+	if((b->giveRotation || b->giveTranslation) &&
+	   b->givenParentBoneIndex>=0 && b->givenParentBoneIndex<pmxInfo.bone_continuing_datasets &&
+	   b->givenParentBoneIndex!=i)
+	{
+		//the source bone must be final (it may itself inherit from another bone)
+		applyInheritance(b->givenParentBoneIndex, state);
+		PMXBone *src=pmxInfo.bones[b->givenParentBoneIndex];
+		
+		//This bone's own animated pose (keyframes; bones without keys stay at rest)
+		glm::quat ownRot=boneRot[i];
+		glm::vec3 ownPos=bonePos[i];
+		if(glm::length(ownRot)<1.0e-6f) ownRot=glm::quat(1.0f,0.0f,0.0f,0.0f);
+		
+		glm::quat rot=ownRot;
+		glm::vec3 pos=ownPos;
+		if(b->giveRotation)
+		{
+			rot = ownRot * scaleRotation(localRotation(src), b->giveRate);
+		}
+		if(b->giveTranslation)
+		{
+			pos += localTranslation(src) * b->giveRate;
+		}
+		
+		glm::vec3 rest = b->parent ? (b->position - b->parent->position) : b->position;
+		b->Local = glm::translate(pos + rest) * glm::toMat4(rot);
+	}
+	
+	state[i]=2;
 }
 
 

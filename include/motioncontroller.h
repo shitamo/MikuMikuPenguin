@@ -80,6 +80,8 @@ class VMDMotionController
 	
 	void updateChildren(ClosedMMDFormat::PMXBone *linkBone);
 	void updateIK();
+	void updateInheritance(); //PMX rotation/translation inheritance ("付与")
+	void applyInheritance(int boneIndex, std::vector<char> &state);
 	void solveIK(ClosedMMDFormat::PMXBone *joint, int effector, glm::vec3 targetPos, int numIteration, int numBones, int numMaxBones);
 	
 	

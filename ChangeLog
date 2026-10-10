@@ -8,6 +8,8 @@ October 10, 2026 (merge of weimingtom/MMP v0.2.1):
  per rendered frame
 -Dropped the OpenGL 3.0 #version 130 shader rewrite (used tmpnam); OpenGL
  3.2 core is required
+-Implemented PMX rotation/translation inheritance (付与): leg D bones
+ (足D/ひざD/足首D), 腰キャンセル, 肩C and eyes now follow their source bones
 
 October 10, 2026:
 -Ported from GLFW 2 to GLFW 3 (GLFW 2 is no longer shipped by distributions)

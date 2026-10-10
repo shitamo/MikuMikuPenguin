@@ -1,3 +1,10 @@
+mikumikupenguin (0.2.1+20261010.1) unstable; urgency=medium
+
+  * Implement PMX rotation/translation inheritance (付与).  Leg D bones,
+    waist cancel, shoulder C and eye bones now follow their source bones.
+
+ -- shitamo <sitamo@gmail.com>  Sat, 10 Oct 2026 22:00:00 +0900
+
 mikumikupenguin (0.2.1+20261010) unstable; urgency=medium
 
   * Merge upstream v0.2.1 (github.com/weimingtom/MMP, mirror of
