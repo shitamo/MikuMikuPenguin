@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sstream>
 
-#include <SOIL/SOIL.h>
+#include <stb/stb_image.h>
 
 #include <cstdio>
 #include <cstddef>
@@ -518,7 +518,9 @@ static GLuint loadTextureFile(const string &requestedPath, bool rgba, bool verbo
 	
 	GLuint texture=0;
 	int width=0, height=0, channels=0;
-	unsigned char *image=SOIL_load_image(loc.c_str(), &width, &height, &channels, rgba ? SOIL_LOAD_RGBA : SOIL_LOAD_RGB);
+	//stb_image handles 8/16-bit PNG, JPEG, BMP, TGA, PSD, GIF (.spa/.sph are BMP/PNG files);
+	//16-bit images are converted to 8 bits per channel.
+	unsigned char *image=stbi_load(loc.c_str(), &width, &height, &channels, rgba ? 4 : 3);
 	
 	glActiveTexture(GL_TEXTURE0);
 	glGenTextures(1, &texture);
@@ -535,13 +537,15 @@ static GLuint loadTextureFile(const string &requestedPath, bool rgba, bool verbo
 		const unsigned char white[4]={255,255,255,255};
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
 		if(verbose) cout<<"failed"<<endl;
-		cerr<<"WARNING: texture could not be loaded: "<<requestedPath<<" ("<<SOIL_last_result()<<")"<<endl;
+		cerr<<"WARNING: texture could not be loaded: "<<requestedPath<<" ("<<(stbi_failure_reason() ? stbi_failure_reason() : "unknown error")<<")"<<endl;
 	}
-	if(image) SOIL_free_image_data(image);
+	if(image) stbi_image_free(image);
 	
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+	//mipmaps: large (e.g. 4096x4096) textures shimmer badly without them
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 	
 	return texture;

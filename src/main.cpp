@@ -1,4 +1,4 @@
-//g++ *.cpp src/*.cpp src/*.cc -o pmx -I/usr/include/bullet -lglfw -lGLU -lGLEW -lGL -lSDL2 -lSDL2_mixer -ggdb -lSOIL -lBulletDynamics -lBulletCollision -lLinearMath -lBulletSoftBody -std=c++11
+//g++ *.cpp src/*.cpp src/*.cc -o pmx -I/usr/include/bullet -lglfw -lGLU -lGLEW -lGL -lSDL2 -lSDL2_mixer -ggdb -lBulletDynamics -lBulletCollision -lLinearMath -lBulletSoftBody -std=c++11
 #include <iostream>
 #include <fstream>
 #include <sstream>

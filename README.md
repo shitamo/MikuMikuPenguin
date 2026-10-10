@@ -31,7 +31,7 @@ https://github.com/sn0w75/MikuMikuPenguin/
 * autotools は pkg-config で依存を検出（git から取得した場合は `./autogen.sh` を実行）
 * Debian パッケージ（debian/）を追加
 
-必要なもの: GLFW 3, GLEW, GLM, Bullet, SOIL（音楽再生には SDL2, SDL2_mixer）、OpenGL 3.2 core profile
+必要なもの: GLFW 3, GLEW, GLM, Bullet, stb_image（音楽再生には SDL2, SDL2_mixer）、OpenGL 3.2 core profile
 
 ## ディレクトリ構成
 
@@ -50,7 +50,7 @@ https://github.com/sn0w75/MikuMikuPenguin/
 
 LibMikuMikuPenguinにはlibglfw, libglew,libglm,libBulletが必要です。
 
-PMXViewerにはlibmmp、libSOILが必要です。VMDと一緒に音楽を再生したい場合は、SDL2、SDL2_mixerも必要です。（なくてもコンパイル出来ます）
+PMXViewerにはlibmmp、stb_image（libstb）が必要です（2026年版で SOIL から変更）。VMDと一緒に音楽を再生したい場合は、SDL2、SDL2_mixerも必要です。（なくてもコンパイル出来ます）
 
 ### ライブラリの詳細（2014年1月20日）：
 

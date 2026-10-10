@@ -9,7 +9,7 @@ Build-Depends: debhelper-compat (= 13),
                libglew-dev,
                libglm-dev,
                libbullet-dev,
-               libsoil-dev,
+               libstb-dev,
                libsdl2-dev,
                libsdl2-mixer-dev
 Standards-Version: 4.7.0

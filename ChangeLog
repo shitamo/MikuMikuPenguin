@@ -32,6 +32,8 @@ October 10, 2026 (merge of weimingtom/MMP v0.2.1):
 -Additional UVs are loaded (models with extra UVs used to abort) and
  extra UV morphs are applied to VMDMotionController::extraUVs (not
  rendered by the viewer)
+-Textures are loaded with stb_image instead of SOIL (SOIL's 2008 image
+ code cannot read 16-bit PNGs); textures now get mipmaps
 
 October 10, 2026:
 -Ported from GLFW 2 to GLFW 3 (GLFW 2 is no longer shipped by distributions)

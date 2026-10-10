@@ -36,11 +36,11 @@ PKG_CHECK_MODULES([BULLET], [bullet])
 # GLM is header-only; it may or may not ship a pkg-config file.
 AC_CHECK_HEADER([glm/glm.hpp], [], [AC_MSG_ERROR([GLM (OpenGL Mathematics) headers not found])])
 
-# SOIL has no pkg-config file.
-AC_CHECK_HEADER([SOIL/SOIL.h], [], [AC_MSG_ERROR([SOIL headers (SOIL/SOIL.h) not found])])
-AC_CHECK_LIB([SOIL], [SOIL_load_image], [SOIL_LIBS="-lSOIL"],
-  [AC_MSG_ERROR([libSOIL not found])], [$GL_LIBS])
-AC_SUBST([SOIL_LIBS])
+# Image loading: stb_image (SOIL bundled a 2008 copy that cannot read
+# 16-bit PNGs and is no longer maintained).
+PKG_CHECK_MODULES([STB], [stb], [],
+  [AC_CHECK_HEADER([stb/stb_image.h], [STB_CFLAGS=""; STB_LIBS="-lstb"],
+     [AC_MSG_ERROR([stb_image (libstb-dev) not found])])])
 
 AC_ARG_ENABLE([sound],
   [AS_HELP_STRING([--disable-sound], [Disable music playback via SDL2_mixer @<:@default=check@:>@])],

@@ -1,3 +1,11 @@
+mikumikupenguin (0.2.1+20261010.7) unstable; urgency=medium
+
+  * Load textures with stb_image (libstb-dev) instead of SOIL; 16-bit PNG
+    textures failed to load ("PNG not supported: 8-bit only").
+  * Generate mipmaps for textures.
+
+ -- shitamo <sitamo@gmail.com>  Sat, 10 Oct 2026 23:40:00 +0900
+
 mikumikupenguin (0.2.1+20261010.6) unstable; urgency=medium
 
   * Implement bone morphs.
