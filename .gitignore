@@ -28,6 +28,7 @@ Makefile.in
 /debian/mikumikupenguin/
 /debian/libmmp-dev/
 /debian/tmp/
+/debian/build/
 
 #ignore data folder
 data/model/

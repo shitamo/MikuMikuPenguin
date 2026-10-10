@@ -3,8 +3,9 @@
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export DEB_CXXFLAGS_MAINT_APPEND = -Wno-sign-compare -Wno-unused-variable -Wno-unused-but-set-variable
 
+# Build out of tree so the source tree never contains configure results.
 %:
-	dh $@
+	dh $@ --builddirectory=debian/build
 
 # libmmp has no stable API/ABI yet, so build it as a static library only
 # and link the viewer against it.
@@ -14,3 +15,17 @@ override_dh_auto_configure:
 override_dh_auto_install:
 	dh_auto_install
 	find debian/tmp -name '*.la' -delete
+
+# Also remove the results of an in-tree ./configure && make (manual builds,
+# or older versions of this package).  "make distclean" with such a stale
+# Makefile can fail because it tries to regenerate the build system, so do
+# not rely on it.
+override_dh_auto_clean:
+	dh_auto_clean
+	-[ ! -f config.status ] || $(MAKE) distclean
+	rm -f config.status config.log config.h stamp-h1 libtool src/pmx
+	find . -path ./debian -prune -o -path ./.git -prune -o \
+	    \( -name Makefile -o -name '*.o' -o -name '*.lo' -o -name '*.la' -o -name '*.a' \) \
+	    -type f -print0 | xargs -0r rm -f
+	find . -path ./debian -prune -o -path ./.git -prune -o \
+	    \( -name .deps -o -name .libs \) -type d -print0 | xargs -0r rm -rf

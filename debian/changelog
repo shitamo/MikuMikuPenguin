@@ -4,6 +4,9 @@ mikumikupenguin (0.2.1+20261010.8) unstable; urgency=medium
   * Use SDL3_mixer for music playback (SDL2_mixer is still supported as a
     fallback at configure time).
   * Keep Ctrl-C/SIGTERM working while music is enabled.
+  * debian/rules: build out of tree (debian/build) and remove the results
+    of stale in-tree builds in clean; "make distclean" with an old Makefile
+    failed after configure.ac changed.
 
  -- shitamo <sitamo@gmail.com>  Sat, 10 Oct 2026 23:59:00 +0900
 
