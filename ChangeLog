@@ -10,6 +10,10 @@ October 10, 2026 (merge of weimingtom/MMP v0.2.1):
  3.2 core is required
 -Implemented PMX rotation/translation inheritance (付与): leg D bones
  (足D/ひざD/足首D), 腰キャンセル, 肩C and eyes now follow their source bones
+-Bone local transforms are rebuilt from the animation every frame, so IK
+ links without keyframes (腕W/ひじW etc.) no longer accumulate twist
+ (arms looked thin)
+-libmmp.h no longer includes the viewer-only glfw_func_callbacks.h
 
 October 10, 2026:
 -Ported from GLFW 2 to GLFW 3 (GLFW 2 is no longer shipped by distributions)

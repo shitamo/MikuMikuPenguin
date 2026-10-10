@@ -1,3 +1,11 @@
+mikumikupenguin (0.2.1+20261010.2) unstable; urgency=medium
+
+  * Rebuild bone local transforms from the animation every frame; IK link
+    bones without keyframes accumulated twist, making arms look thin.
+  * libmmp.h: do not include the viewer-only glfw_func_callbacks.h.
+
+ -- shitamo <sitamo@gmail.com>  Sat, 10 Oct 2026 22:20:00 +0900
+
 mikumikupenguin (0.2.1+20261010.1) unstable; urgency=medium
 
   * Implement PMX rotation/translation inheritance (付与).  Leg D bones,

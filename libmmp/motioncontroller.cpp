@@ -299,15 +299,21 @@ void VMDMotionController::updateBoneAnimation()
 				
 				if(time!=t1) --ite_boneKeyFrames[i];
 			}
-
-			if(b->parent)
-			{
-				b->Local = glm::translate( bonePos[i] + b->position - b->parent->position ) * glm::toMat4(boneRot[i]);
-			}
-			else
-			{
-				b->Local = glm::translate( bonePos[i] + b->position ) * glm::toMat4(boneRot[i]);
-			}
+		}
+		
+		//Rebuild every bone's local transform from its animation pose each
+		//frame (bones without keyframes go back to the rest pose).  IK and
+		//inheritance then start from a clean state, as in MMD.  Previously
+		//bones without keyframes (IK links such as 腕W/ひじW/ひざ) kept the
+		//previous frame's IK result, so their twist drifted over time and
+		//the skin weighted to them collapsed (arms looked thin).
+		if(b->parent)
+		{
+			b->Local = glm::translate( bonePos[i] + b->position - b->parent->position ) * glm::toMat4(boneRot[i]);
+		}
+		else
+		{
+			b->Local = glm::translate( bonePos[i] + b->position ) * glm::toMat4(boneRot[i]);
 		}
 	}
 
