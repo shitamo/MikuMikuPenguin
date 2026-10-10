@@ -38,6 +38,13 @@ October 10, 2026 (merge of weimingtom/MMP v0.2.1):
  both GLX and EGL, i.e. X11 and Wayland)
 -Music playback uses SDL3_mixer when available, SDL2_mixer otherwise;
  SDL no longer swallows Ctrl-C/SIGTERM
+-MMD-style shading: diffuse*light + ambient, texture, sphere map
+ (multiply/add, view-space normal), toon ramp from N.L, Blinn-Phong
+ specular with the material's power, MMD's default light; material morph
+ sphere/toon coefficients
+-Back-face culling per material (draw-both-sides flag), correct front face
+ winding (clockwise); outlines are drawn after the model, depth tested,
+ with a constant on-screen width of edgeSize pixels
 
 October 10, 2026:
 -Ported from GLFW 2 to GLFW 3 (GLFW 2 is no longer shipped by distributions)

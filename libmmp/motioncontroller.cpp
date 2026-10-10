@@ -330,8 +330,10 @@ void VMDMotionController::updateMaterialMorphs()
 		MaterialState &mu=acc[m].mul, &ad=acc[m].add;
 		mu.diffuse=glm::vec4(1.0f); mu.specular=glm::vec3(1.0f); mu.shininess=1.0f; mu.ambient=glm::vec3(1.0f);
 		mu.edgeColor=glm::vec4(1.0f); mu.edgeSize=1.0f; mu.textureMul=glm::vec4(1.0f); mu.textureAdd=glm::vec4(0.0f);
+		mu.sphereMul=glm::vec4(1.0f); mu.sphereAdd=glm::vec4(0.0f); mu.toonMul=glm::vec4(1.0f); mu.toonAdd=glm::vec4(0.0f);
 		ad.diffuse=glm::vec4(0.0f); ad.specular=glm::vec3(0.0f); ad.shininess=0.0f; ad.ambient=glm::vec3(0.0f);
 		ad.edgeColor=glm::vec4(0.0f); ad.edgeSize=0.0f; ad.textureMul=glm::vec4(0.0f); ad.textureAdd=glm::vec4(0.0f);
+		ad.sphereMul=glm::vec4(0.0f); ad.sphereAdd=glm::vec4(0.0f); ad.toonMul=glm::vec4(0.0f); ad.toonAdd=glm::vec4(0.0f);
 	}
 	
 	for(int i=0; i<pmxInfo.morph_continuing_datasets; ++i)
@@ -359,6 +361,8 @@ void VMDMotionController::updateMaterialMorphs()
 					mu.edgeColor *= glm::mix(glm::vec4(1.0f), mm->edgeColor, w);
 					mu.edgeSize  *= glm::mix(1.0f, mm->edgeSize, w);
 					mu.textureMul*= glm::mix(glm::vec4(1.0f), mm->textureCoefficient, w);
+					mu.sphereMul *= glm::mix(glm::vec4(1.0f), mm->sphereTextureCoefficient, w);
+					mu.toonMul   *= glm::mix(glm::vec4(1.0f), mm->toonTextureCoefficient, w);
 				}
 				else //addition
 				{
@@ -370,6 +374,8 @@ void VMDMotionController::updateMaterialMorphs()
 					ad.edgeColor += mm->edgeColor * w;
 					ad.edgeSize  += mm->edgeSize * w;
 					ad.textureAdd+= mm->textureCoefficient * w;
+					ad.sphereAdd += mm->sphereTextureCoefficient * w;
+					ad.toonAdd   += mm->toonTextureCoefficient * w;
 				}
 			}
 		}
@@ -389,6 +395,10 @@ void VMDMotionController::updateMaterialMorphs()
 		st.edgeSize  = base->edgeSize  * mu.edgeSize  + ad.edgeSize;
 		st.textureMul= mu.textureMul;
 		st.textureAdd= ad.textureAdd;
+		st.sphereMul = mu.sphereMul;
+		st.sphereAdd = ad.sphereAdd;
+		st.toonMul   = mu.toonMul;
+		st.toonAdd   = ad.toonAdd;
 	}
 }
 

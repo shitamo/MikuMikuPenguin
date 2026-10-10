@@ -84,6 +84,10 @@ class VMDMotionController
 		float edgeSize;
 		glm::vec4 textureMul; //texture colour = texture*textureMul + textureAdd
 		glm::vec4 textureAdd;
+		glm::vec4 sphereMul;  //same for the sphere map
+		glm::vec4 sphereAdd;
+		glm::vec4 toonMul;    //same for the toon texture
+		glm::vec4 toonAdd;
 	};
 	std::vector<MaterialState> materialStates;
 	

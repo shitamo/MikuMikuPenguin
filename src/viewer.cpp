@@ -94,6 +94,9 @@ Viewer::Viewer(string modelPath, string motionPath,string musicPath)
     
 	//Set OpenGL render settings
 	glDisable(GL_CULL_FACE);
+	//PMX triangles are clockwise in Direct3D; mirroring Z for OpenGL keeps them
+	//clockwise on screen, so clockwise is the front face here.
+	glFrontFace(GL_CW);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -157,8 +160,9 @@ void Viewer::render()
 {
 	if(!keyPressed(GLFW_KEY_A))
 	{
-		drawModel(true); //draw model edges
 		drawModel(false); //draw model
+		drawModel(true); //draw outlines (MMD draws them after the model, depth tested)
+		glDisable(GL_CULL_FACE);
 	}
 	
 	if(keyPressed(GLFW_KEY_S))
@@ -280,6 +284,8 @@ void Viewer::setCamera(GLuint MVPLoc)
 	glm::mat4 Model = glm::translate(modelTranslate);
 	// Our ModelViewProjection : multiplication of our 3 matrices
 	glm::mat4 MVP = Projection * View * Model;
+	viewMatrix = View;
+	modelViewMatrix = View * Model;
 	
 	glUniformMatrix4fv(MVPLoc, 1, GL_FALSE, &MVP[0][0]);
 }
@@ -297,7 +303,8 @@ void Viewer::drawModel(bool drawEdges)
 		glCullFace(GL_FRONT);
         glUniform1i(uniformVars[uIsEdge], 1);
         
-        glDisable(GL_DEPTH_TEST);
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_LEQUAL);
 	}
 	else
 	{        
@@ -311,10 +318,15 @@ void Viewer::drawModel(bool drawEdges)
 	}
 	
 	
-	glm::vec3 halfVector=glm::normalize(cameraPosition-cameraTarget);
-	halfVector.z=-halfVector.z;
-	
-	glm::vec3 lightDirection=glm::normalize(glm::vec3(0.3,1.0,2.0));
+	//MMD default light: colour (154,154,154), direction (-0.5,-1.0,0.5) in MMD
+	//(left-handed) coordinates = (-0.5,-1.0,-0.5) here.  Lighting is done in
+	//view space.
+	glm::vec3 lightDirWorld=glm::normalize(glm::vec3(-0.5f,-1.0f,-0.5f));
+	glm::vec3 lightDirView=glm::normalize(glm::mat3(viewMatrix)*lightDirWorld);
+	glUniform3f(uniformVars[uLightDirection],lightDirView.x,lightDirView.y,lightDirView.z);
+	glUniform3f(uniformVars[uLightColor],154.0f/255.0f,154.0f/255.0f,154.0f/255.0f);
+	glUniformMatrix4fv(uniformVars[uMV],1,GL_FALSE,&modelViewMatrix[0][0]);
+	glUniform2f(uniformVars[uScreenSize],(float)framebufferWidth,(float)framebufferHeight);
 	
 	int faceCount=0;
 	for(int m=0; m<pmxInfo->material_continuing_datasets; ++m) //pmxInfo->material_continuing_datasets
@@ -343,6 +355,10 @@ void Viewer::drawModel(bool drawEdges)
 			glUniform1i(uniformVars[uSphereSampler], 1);
 		}
 		
+		bool hasToon = pmxInfo->materials[m]->shareToon==1 ||
+		               (pmxInfo->materials[m]->toonTextureIndex>=0 && pmxInfo->materials[m]->toonTextureIndex<(int)textures.size()-10);
+		glUniform1i(uniformVars[uUseToon], hasToon ? 1 : 0);
+		
 		if((int)pmxInfo->materials[m]->shareToon==0)
 		{
 			glActiveTexture(GL_TEXTURE2);
@@ -364,17 +380,37 @@ void Viewer::drawModel(bool drawEdges)
 		glUniform3fv(uniformVars[uSpecular],1,(GLfloat*)&mat.specular);
 		glUniform4fv(uniformVars[uTextureMul],1,(GLfloat*)&mat.textureMul);
 		glUniform4fv(uniformVars[uTextureAdd],1,(GLfloat*)&mat.textureAdd);
+		glUniform4fv(uniformVars[uSphereMul],1,(GLfloat*)&mat.sphereMul);
+		glUniform4fv(uniformVars[uSphereAdd],1,(GLfloat*)&mat.sphereAdd);
+		glUniform4fv(uniformVars[uToonMul],1,(GLfloat*)&mat.toonMul);
+		glUniform4fv(uniformVars[uToonAdd],1,(GLfloat*)&mat.toonAdd);
 		
-		glUniform1f(uniformVars[uShininess],mmp::scalarNormalize(mat.shininess));
-		glUniform3f(uniformVars[uHalfVector],halfVector.x,halfVector.y,halfVector.z);
-		glUniform3f(uniformVars[uLightDirection],lightDirection.x,lightDirection.y,lightDirection.z);
+		glUniform1f(uniformVars[uShininess],mat.shininess);
+
 		
 		glUniform4fv(uniformVars[uEdgeColor],1,(GLfloat*)&mat.edgeColor);
-		glUniform1f(uniformVars[uEdgeSize],mmp::scalarNormalize(mat.edgeSize));
+		glUniform1f(uniformVars[uEdgeSize],mat.edgeSize);
 		
-		glUniform1f(uniformVars[uSphereMode],pmxInfo->materials[m]->sphereMode);
+		//sphere maps only apply when the material actually has a sphere texture
+		int sphereIdx=pmxInfo->materials[m]->sphereIndex;
+		bool hasSphere = sphereIdx>=0 && sphereIdx<(int)textures.size()-10;
+		glUniform1f(uniformVars[uSphereMode], hasSphere ? (float)pmxInfo->materials[m]->sphereMode : 0.0f);
         
-		glDrawElements(GL_TRIANGLES, (pmxInfo->materials[m]->hasFaceNum), GL_UNSIGNED_INT, BUFFER_OFFSET(sizeof(GLuint)*faceCount));
+		if(drawEdges)
+		{
+			glEnable(GL_CULL_FACE); //outline = back faces of the inflated mesh
+			glCullFace(GL_FRONT);
+		}
+		else if(pmxInfo->materials[m]->drawBothSides)
+		{
+			glDisable(GL_CULL_FACE);
+		}
+		else
+		{
+			glEnable(GL_CULL_FACE);
+			glCullFace(GL_BACK);
+		}
+				glDrawElements(GL_TRIANGLES, (pmxInfo->materials[m]->hasFaceNum), GL_UNSIGNED_INT, BUFFER_OFFSET(sizeof(GLuint)*faceCount));
 		faceCount+=pmxInfo->materials[m]->hasFaceNum;
 	}
 }
@@ -702,7 +738,6 @@ void Viewer::initUniformVarLocations()
 	uniformVars[uEdgeColor]=glGetUniformLocation(shaderProgram, "edgeColor");
 	uniformVars[uEdgeSize]=glGetUniformLocation(shaderProgram, "edgeSize");
 	
-	uniformVars[uHalfVector]=glGetUniformLocation(shaderProgram, "halfVector");
 	
 	uniformVars[uLightDirection]=glGetUniformLocation(shaderProgram, "lightDirection");
 	
@@ -713,6 +748,14 @@ void Viewer::initUniformVarLocations()
 	uniformVars[uToonSampler]=glGetUniformLocation(shaderProgram,"toonSampler");
 	uniformVars[uTextureMul]=glGetUniformLocation(shaderProgram,"textureMul");
 	uniformVars[uTextureAdd]=glGetUniformLocation(shaderProgram,"textureAdd");
+	uniformVars[uLightColor]=glGetUniformLocation(shaderProgram,"lightColor");
+	uniformVars[uUseToon]=glGetUniformLocation(shaderProgram,"useToon");
+	uniformVars[uMV]=glGetUniformLocation(shaderProgram,"MV");
+	uniformVars[uScreenSize]=glGetUniformLocation(shaderProgram,"screenSize");
+	uniformVars[uSphereMul]=glGetUniformLocation(shaderProgram,"sphereMul");
+	uniformVars[uSphereAdd]=glGetUniformLocation(shaderProgram,"sphereAdd");
+	uniformVars[uToonMul]=glGetUniformLocation(shaderProgram,"toonMul");
+	uniformVars[uToonAdd]=glGetUniformLocation(shaderProgram,"toonAdd");
 }
 
 Viewer::~Viewer()

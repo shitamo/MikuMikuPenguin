@@ -15,9 +15,12 @@ in vec3 vSdefR0; //SDEF pre-processed rotation centre for bone 1
 in vec3 vSdefR1; //SDEF pre-processed rotation centre for bone 2
 
 out vec2 UV;
-out vec3 normal;
+out vec3 normal;   //view-space normal
+out vec3 viewPos;  //view-space position
 
 uniform mat4 MVP;
+uniform mat4 MV;          //model-view matrix (for lighting / sphere maps)
+uniform vec2 screenSize;  //framebuffer size in pixels (for edge width)
 uniform samplerBuffer boneTexture; //skinning matrices, 4 RGBA32F texels per bone
 
 vec4 quatFromMat3(mat3 m)
@@ -151,21 +154,24 @@ void main()
 		newNormal = vec4(vNormal, 0.0);
 	}
 	
+	vec3 viewNormal = normalize(mat3(MV) * newNormal.xyz);
+	
 	if(isEdge)
 	{
-		vec4 pos = MVP * vec4(newVertex);
-		vec4 pos2 = MVP * vec4(newVertex + newNormal);
-		vec4 norm = normalize(pos2 - pos);
-		gl_Position = pos + norm * edgeSize/10.f;
+		//MMD-style outline: push the vertex out along the screen-space normal by
+		//edgeSize pixels (scaled by w so the width is constant on screen)
+		vec4 pos = MVP * vec4(newVertex.xyz, 1.0);
+		vec2 screenNormal = normalize(viewNormal.xy + vec2(1e-6));
+		pos.xy += screenNormal * (2.0 / max(screenSize, vec2(1.0))) * edgeSize * pos.w;
+		gl_Position = pos;
+		UV = vUV;
+		normal = viewNormal;
+		viewPos = (MV * vec4(newVertex.xyz, 1.0)).xyz;
 		return;
-    }
+	}
 	
-	//newVertex = vPosition;
-	//newNormal = vec4(vNormal, 0.0);
-	
-	//newVertex.w = 1.0;
-
-	gl_Position = MVP * newVertex;
-	UV 		    = vUV;
-	normal      = normalize(newNormal.xyz);
+	gl_Position = MVP * vec4(newVertex.xyz, 1.0);
+	UV          = vUV;
+	normal      = viewNormal;
+	viewPos     = (MV * vec4(newVertex.xyz, 1.0)).xyz;
 }

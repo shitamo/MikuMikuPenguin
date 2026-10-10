@@ -1,120 +1,87 @@
 #version 150
 
+// MMD-compatible material shading:
+//   color = clamp(diffuse*lightColor + ambient) * texture
+//           (*|+) sphere map  * toon(N.L)  + specular
+
 uniform sampler2D textureSampler;
 uniform sampler2D sphereSampler;
 uniform sampler2D toonSampler;
 
-uniform vec3 ambient;
 uniform vec4 diffuse;
+uniform vec3 ambient;
 uniform vec3 specular;
-uniform float shininess;
+uniform float shininess;   //specular power
 
-uniform vec3 lightDirection; //direction towards the light
-uniform vec3 halfVector; //surface orientation for shiniest spots- the vector stretching from from the camera position to the target
+uniform vec3 lightColor;   //MMD default: 154/255
+uniform vec3 lightDirection; //direction the light travels, in view space
 
 uniform bool isEdge;
 uniform vec4 edgeColor;
-uniform float edgeSize;
 
-uniform float fSphereMode; //sphereMode stored as a float
+uniform float fSphereMode; //0: none 1: multiply (sph) 2: add (spa) 3: sub-texture (not supported)
+uniform bool useToon;
 
 //material morph texture coefficients: tex = tex*textureMul + textureAdd
 uniform vec4 textureMul;
 uniform vec4 textureAdd;
-
+uniform vec4 sphereMul;
+uniform vec4 sphereAdd;
+uniform vec4 toonMul;
+uniform vec4 toonAdd;
 
 in vec2 UV;
 in vec3 normal;
+in vec3 viewPos;
 
 out vec4 color;
-
-vec4 getSphereColor()
-{
-	int sphereMode=int(fSphereMode);
-	
-	vec4 sphereColor=vec4(0,0,0,0);
-	
-	if(sphereMode>0) //if sphere mapping is used
-	{
-		vec2 sphereCoord = 0.5 * (1.0 + vec2(1.0, -1.0) * normalize(normal).xy);
-		sphereColor=texture(sphereSampler, sphereCoord);
-	}
-	
-	return sphereColor;
-}
 
 void main()
 {
 	if(isEdge)
 	{
-		color=edgeColor;
+		color = edgeColor;
 		return;
 	}
 	
-	int sphereMode=int(fSphereMode);
+	vec3 N = normalize(normal);
+	vec3 L = normalize(-lightDirection);   //towards the light
+	vec3 V = normalize(-viewPos);          //towards the eye
 	
-	vec3 textureColor=vec3(1.0,1.0,1.0);
+	float alpha = diffuse.a;
 	
-	vec4 texel = texture(textureSampler, UV) * textureMul + textureAdd;
-	texel = clamp(texel, 0.0, 1.0);
-	textureColor *= texel.rgb;
+	//base colour
+	vec3 c = clamp(diffuse.rgb * lightColor + ambient, 0.0, 1.0);
 	
-	vec4 sphereColor=getSphereColor();
+	//texture
+	vec4 tex = clamp(texture(textureSampler, UV) * textureMul + textureAdd, 0.0, 1.0);
+	c *= tex.rgb;
+	alpha *= tex.a;
+	if(alpha <= 0.0) discard;
 	
-	//finalColor*=sphereColor;
-	
-	//(an old IK-marker debug branch used to colour vertices whose UV had a 0
-	// component pink/green; it has been removed)
-	
+	//sphere map (view-space normal -> UV)
+	int sphereMode = int(fSphereMode + 0.5);
+	if(sphereMode == 1 || sphereMode == 2)
 	{
-		float intensity = dot(normalize(normal),lightDirection);
-		vec3 lightColor=normalize(vec3(1.0,1.0,0.95));
-		
-		vec3 scatteredLight;
-		
-		if(intensity > 0.99) scatteredLight=ambient+ (diffuse.rgb*lightColor*.8);
-		else if(intensity > 0.3) scatteredLight=ambient+ (diffuse.rgb*lightColor * 0.75);
-		else scatteredLight = ambient + (diffuse.rgb *lightColor * 0.5);
-		
-		float specularWeight;
-		if(intensity==0.0) //if surface is facing away from light
-		{
-			specularWeight=0.0;
-		}
-		else
-		{ 
-			specularWeight = pow(max(0.0,dot(halfVector,normal)),shininess); //sharpen the highlight
-		}
-		
-		intensity = dot(normalize(normal),halfVector);
-		vec3 reflectedLight=vec3(0.0);
-		if(intensity>.999)reflectedLight=(specular*specularWeight);
-		
-		
-		float dotNL = max(0.0, dot(normalize(lightDirection), normalize(normal)));
-        vec2 toonCoord = vec2(0.0, 0.5 * (1.0 - dotNL));
-        vec3 toon = texture(toonSampler, toonCoord).rgb;
-		
-		vec3 colorRGB=min((textureColor*scatteredLight) + reflectedLight,vec3(1.0));
-		color=vec4(colorRGB, texel.a * diffuse.a);
-		
-		/*if(sphereMode==1)
-		{
-			//color=vec4(color.x*sphereColor.x,color.y*sphereColor.y,color.z*sphereColor.z,color.w);
-			vec3 colorTest=cross(vec3(sphereColor),vec3(color));
-			//vec3 colorTest=vec3(color)*vec3(sphereColor);
-			color+=vec4(colorTest,color.w);
-		}
-		else if(sphereMode==2)
-		{
-			color+=sphereColor;
-		}*/
-		
-		/*if(sphereMode>0)
-		{
-			color=vec4(1.0,0.0,0,1);
-		}*/
-		
+		vec2 sphereUV = vec2(N.x * 0.5 + 0.5, 1.0 - (N.y * 0.5 + 0.5));
+		vec3 sph = clamp(texture(sphereSampler, sphereUV) * sphereMul + sphereAdd, 0.0, 1.0).rgb;
+		if(sphereMode == 1) c *= sph;
+		else                c += sph;
 	}
-
+	
+	//toon shading: the toon texture is looked up with the N.L term
+	if(useToon)
+	{
+		float ln = clamp(dot(N, L) + 0.5, 0.0, 1.0);
+		c *= clamp(texture(toonSampler, vec2(0.5, 1.0 - ln)) * toonMul + toonAdd, 0.0, 1.0).rgb;
+	}
+	
+	//specular (Blinn-Phong, like MMD)
+	if(shininess > 0.0)
+	{
+		vec3 H = normalize(V + L);
+		c += pow(max(dot(H, N), 0.0), shininess) * specular * lightColor;
+	}
+	
+	color = vec4(clamp(c, 0.0, 1.0), alpha);
 }

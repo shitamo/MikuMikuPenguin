@@ -1,3 +1,11 @@
+mikumikupenguin (0.2.1+20261011) unstable; urgency=medium
+
+  * MMD-style material shading (toon ramp, sphere maps, specular, MMD
+    default light) including material morph sphere/toon coefficients.
+  * Per-material back-face culling and MMD-style outlines.
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 00:50:00 +0900
+
 mikumikupenguin (0.2.1+20261010.8) unstable; urgency=medium
 
   * Use libepoxy instead of GLEW for OpenGL function loading.

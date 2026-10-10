@@ -15,10 +15,12 @@ enum Attrib_IDs { vPosition, vUV, vNormal, vBoneIndices, vBoneWeights, vWeightFo
 enum Uniform_IDs { 
 	uAmbient,uDiffuse,uSpecular,uShininess,
 	uIsEdge,uEdgeColor,uEdgeSize,
-	uHalfVector,uLightDirection,
+	uLightDirection,
 	uSphereMode,
 	uTextureSampler,uSphereSampler,uToonSampler,
 	uTextureMul,uTextureAdd,
+	uLightColor,uUseToon,uMV,uScreenSize,
+	uSphereMul,uSphereAdd,uToonMul,uToonAdd,
 	NumUniforms };
 
 namespace ClosedMMDFormat
@@ -54,6 +56,7 @@ class Viewer
 	void fpsCount();
 	
 	void setCamera(GLuint MVPLoc);
+	glm::mat4 viewMatrix, modelViewMatrix;
 	bool keyPressed(int key);
 	void holdModelInBindPose();
 	
