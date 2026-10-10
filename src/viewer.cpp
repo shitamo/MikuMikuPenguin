@@ -129,7 +129,16 @@ Viewer::Viewer(string modelPath, string motionPath,string musicPath)
 	startTime = glfwGetTime();
 	ticks=0;
 	
-	modelTranslate=glm::vec3(0.0f,-10.0f,0.0f);
+	//model bounding box at rest, used to frame the camera
+	modelMin=glm::vec3(1e30f); modelMax=glm::vec3(-1e30f);
+	for(int i=0; i<pmxInfo->vertex_continuing_datasets; ++i)
+	{
+		modelMin=glm::min(modelMin, pmxInfo->vertices[i]->pos);
+		modelMax=glm::max(modelMax, pmxInfo->vertices[i]->pos);
+	}
+	if(pmxInfo->vertex_continuing_datasets==0) { modelMin=glm::vec3(-10.0f,0.0f,-10.0f); modelMax=glm::vec3(10.0f,20.0f,10.0f); }
+	modelTranslate=glm::vec3(0.0f);
+	resetCamera();
 }
 
 void Viewer::handleLogic()
@@ -276,12 +285,15 @@ void Viewer::run()
 void Viewer::setCamera(GLuint MVPLoc)
 {
 	float aspect = (framebufferWidth>0 && framebufferHeight>0) ? (float)framebufferWidth/(float)framebufferHeight : 16.0f/9.0f;
-	glm::mat4 Projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
-	// Camera matrix
+	//MMD's default field of view is 30 degrees
+	float nearPlane = glm::max(radius*0.01f, 0.01f);
+	float farPlane  = radius*20.0f + glm::length(modelMax-modelMin)*4.0f;
+	glm::mat4 Projection = glm::perspective(glm::radians(30.0f), aspect, nearPlane, farPlane);
+	// Camera matrix: orbit around cameraTarget
 	glm::mat4 View       = glm::lookAt(
-		glm::vec3(cameraPosition.x,cameraPosition.y,-cameraPosition.z), // Camera is at (4,3,3), in World Space
-		cameraTarget, // and looks at the origin
-		glm::vec3(0,1,0)  // Head is up (set to 0,-1,0 to look upside-down)
+		cameraTarget + glm::vec3(cameraPosition.x,cameraPosition.y,-cameraPosition.z),
+		cameraTarget,
+		glm::vec3(0,1,0)
 	);
 	//View= glm::rotate(0.0f,0.0f,0.0f,1.0f)* View;
 	// Model matrix : an identity matrix (model will be at the origin)
@@ -292,6 +304,30 @@ void Viewer::setCamera(GLuint MVPLoc)
 	modelViewMatrix = View * Model;
 	
 	glUniformMatrix4fv(MVPLoc, 1, GL_FALSE, &MVP[0][0]);
+}
+
+void Viewer::resetCamera()
+{
+	//Look at the centre of the model from the front (MMD looks from -Z in its
+	//own coordinates, i.e. +Z here) and back off until the whole model fits
+	//vertically and horizontally with some margin.
+	glm::vec3 size=modelMax-modelMin;
+	glm::vec3 centre=(modelMin+modelMax)*0.5f;
+	float aspect = (framebufferWidth>0 && framebufferHeight>0) ? (float)framebufferWidth/(float)framebufferHeight : 16.0f/9.0f;
+	float halfFov=glm::radians(30.0f)*0.5f;
+	float fitHeight=(size.y*0.5f)/tanf(halfFov);
+	float fitWidth =(glm::max(size.x, size.z)*0.5f)/(tanf(halfFov)*aspect);
+	float dist=glm::max(fitHeight, fitWidth)*1.15f + size.z*0.5f;
+	if(!(dist>0.0f) || dist>1e6f) dist=45.0f;
+	
+	cameraTarget=glm::vec3(0.0f, centre.y, 0.0f);
+	radius=dist;
+	theta=3.0f*M_PI/2.0f;
+	zenith=0.0f;
+	zoomStep=dist*0.05f;
+	minRadius=dist*0.02f;
+	updateCameraPosition();
+	modelTranslate=glm::vec3(0.0f);
 }
 
 void Viewer::drawModel(bool drawEdges)
@@ -771,13 +807,17 @@ Viewer::~Viewer()
 void Viewer::handleEvents()
 {
 	glfwPollEvents();
-	if(keyPressed(GLFW_KEY_UP))
+	if(keyPressed(GLFW_KEY_R))
 	{
-		modelTranslate.y-=0.1;
+		resetCamera();
+	}
+		if(keyPressed(GLFW_KEY_UP))
+	{
+		modelTranslate.y-=radius*0.005f;
 	}
 	else if(keyPressed(GLFW_KEY_DOWN))
 	{
-		modelTranslate.y+=0.1;
+		modelTranslate.y+=radius*0.005f;
 	}
 }
 

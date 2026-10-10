@@ -17,6 +17,12 @@ extern glm::vec3 cameraTarget;
 extern int prevX,prevY;
 extern int prevWheel;
 
+extern float zoomStep;
+extern float minRadius;
+
+//! Recompute cameraPosition (offset from cameraTarget) from theta/zenith/radius
+void updateCameraPosition();
+
 //***Mouse Callbacks (GLFW 3)***
 void mouseWheel(GLFWwindow *window, double xoffset, double yoffset);
 void mouseMotion(GLFWwindow *window, double x, double y);

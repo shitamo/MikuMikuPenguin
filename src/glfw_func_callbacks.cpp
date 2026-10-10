@@ -21,28 +21,24 @@ int prevX=0,prevY=0;
 int prevWheel=0;
 
 
+float zoomStep=1.0f;   //mouse wheel step (set from the model size)
+float minRadius=1.0f;
+
+void updateCameraPosition()
+{
+	t=radius*cos(zenith);
+	cameraPosition.y=radius*sin(zenith);
+	cameraPosition.x=t*cos(theta);
+	cameraPosition.z=t*sin(theta);
+}
+
 void mouseWheel(GLFWwindow *window, double xoffset, double yoffset)
 {
 	(void)window; (void)xoffset;
-	if(yoffset>0) //up
-	{
-		radius-=1.0f;
-		if(radius<1.0f) radius=1.0f;
-		t=radius*cos(zenith);
-		cameraPosition.y=radius*sin(zenith);
-	
-		cameraPosition.x=t*cos(theta);
-		cameraPosition.z=t*sin(theta);
-	}
-	else if(yoffset<0) //down
-	{
-		radius+=1.0f;
-		t=radius*cos(zenith);
-		cameraPosition.y=radius*sin(zenith);
-	
-		cameraPosition.x=t*cos(theta);
-		cameraPosition.z=t*sin(theta);
-	}
+	if(yoffset>0) radius-=zoomStep; //up: zoom in
+	else if(yoffset<0) radius+=zoomStep; //down: zoom out
+	if(radius<minRadius) radius=minRadius;
+	updateCameraPosition();
 }
 
 void mouseMotion(GLFWwindow *window, double xpos, double ypos)
@@ -57,20 +53,8 @@ void mouseMotion(GLFWwindow *window, double xpos, double ypos)
 	
 		if(zenith>=M_PI/2) zenith=M_PI/2-0.0001f;
 		if(zenith<=-M_PI/2) zenith=-M_PI/2+0.0001f;
-	
-		//cout<<theta<<" "<<zenith<<endl;
-		//cout<<dx<<" "<<dy<<endl;
-	
-		t=radius*cos(zenith);
-		cameraPosition.y=radius*sin(zenith);
-	
-		cameraPosition.x=t*cos(theta);
-		cameraPosition.z=t*sin(theta);
-	
-	
-		//cameraPosition.z=radius*sin(theta)+radius2*cos(theta2);
-	
+		
+		updateCameraPosition();
 	}
 	prevX=x, prevY=y;
 }
-

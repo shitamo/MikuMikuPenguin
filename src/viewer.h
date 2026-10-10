@@ -56,6 +56,8 @@ class Viewer
 	void fpsCount();
 	
 	void setCamera(GLuint MVPLoc);
+	void resetCamera(); //frame the whole model (MMD-like front view)
+	glm::vec3 modelMin, modelMax;
 	glm::mat4 viewMatrix, modelViewMatrix;
 	bool keyPressed(int key);
 	void holdModelInBindPose();

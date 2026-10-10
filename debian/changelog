@@ -1,3 +1,10 @@
+mikumikupenguin (0.2.1+20261011.2) unstable; urgency=medium
+
+  * Frame the whole model with the default camera (MMD-like 30 degree
+    field of view); add R to reset the camera.
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 01:25:00 +0900
+
 mikumikupenguin (0.2.1+20261011.1) unstable; urgency=medium
 
   * Start the physics simulation from the first frame's pose; skirts and

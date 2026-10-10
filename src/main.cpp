@@ -39,7 +39,7 @@ void printHelpInfo()
 	<<"  left drag\trotate camera      wheel\tzoom"<<endl
 	<<"  Up/Down\tmove model          Q (hold)\tpause physics"<<endl
 	<<"  A (hold)\thide model          S/D/F/G (hold)\tBullet debug drawing"<<endl
-	<<"  Esc\t\tquit"<<endl<<endl
+	<<"  R\t\treset camera       Esc\tquit"<<endl<<endl
 	<<"FOR JAPANESE DOCUMENTATION, SEE:"<<endl
 	<<"<file://"<<DATA_PATH<<"/doc/README_JP.html>"<<endl<<endl
 	<<"Report bugs to <ibenrunnin@gmail.com> (English or Japanese is ok)."<<endl;
