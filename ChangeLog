@@ -1,3 +1,13 @@
+October 11, 2026 (multiple models):
+-Several models can be played together: "pmx a.pmx a.vmd b.pmx b.vmd ..."
+ (each VMD belongs to the model before it; a model may have no motion).
+ They share the time line, camera, light and shadows; each has its own
+ Bullet world. --pos X,Y,Z places the preceding model; the settings panel
+ shows every model with show/hide and position
+-Camera/light/self shadow keys come from -c/-l or the first motion VMD
+ that has them; the motion ends at the last key of any model
+-libmmp: VMDMotionController::bindBoneTexture()
+
 October 11, 2026 (GUI):
 -On-screen controls with Dear ImGui: a playback bar (beginning, -1 s,
  -1 frame, play/pause, +1 frame, +1 s, end, timeline slider, loop, time)

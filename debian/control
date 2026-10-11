@@ -25,9 +25,10 @@ Depends: ${shlibs:Depends}, ${misc:Depends}
 Recommends: fonts-noto-cjk | fonts-ipafont-gothic | fonts-vlgothic
 Description: MikuMikuDance PMX/PMD/VMD viewer for Linux
  MikuMikuPenguin is a library (libmmp) and a demonstration viewer for
- MikuMikuDance (MMD) data.  The viewer, pmx, loads a PMX 2.0 or PMD model and
- plays a VMD motion on it with toon shading and Bullet physics, including VMD
- camera and light motion, optionally playing music through SDL_mixer.
+ MikuMikuDance (MMD) data.  The viewer, pmx, loads PMX 2.0 or PMD models and
+ plays VMD motions on them with toon shading, shadows and Bullet physics,
+ including VMD camera and light motion, optionally playing music through
+ SDL_mixer.
  .
  An OpenGL 3.3 core profile capable driver is required.
 

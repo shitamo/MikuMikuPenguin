@@ -441,6 +441,13 @@ void VMDMotionController::updateBoneMatrix()
 	glActiveTexture(GL_TEXTURE0);
 }
 
+void VMDMotionController::bindBoneTexture()
+{
+	glActiveTexture(GL_TEXTURE0 + BONE_TEXTURE_UNIT);
+	glBindTexture(GL_TEXTURE_BUFFER, boneTexture);
+	glActiveTexture(GL_TEXTURE0);
+}
+
 //Bone pose from the VMD plus bone morphs
 glm::vec3 VMDMotionController::animatedPosition(int i) const
 {

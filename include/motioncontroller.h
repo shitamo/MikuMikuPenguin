@@ -49,7 +49,8 @@ class VMDMotionController
 	~VMDMotionController();
 	void updateVertexMorphs(); 			//!< \if ENGLISH \brief A function used to update the Vertices of a model based on Vertex Morph animation parameters. \endif
 										//!< \if JAPANESE \brief 頂点モーフのモーションパラメータを利用してモデルの頂点を更新する為の関数。 \endif
-	void updateBoneMatrix();			//!< \if ENGLISH \brief A function used to update the uniform 'Bones' in the shader program shaderProgram with the model's bone transformation matrices. \endif
+	void updateBoneMatrix();
+	void bindBoneTexture();				//!< bind this model's bone matrices to BONE_TEXTURE_UNIT (when several models are drawn)			//!< \if ENGLISH \brief A function used to update the uniform 'Bones' in the shader program shaderProgram with the model's bone transformation matrices. \endif
 										//!< \if JAPANESE \brief Uniform変数「Bones」をモデルのボーン変形行列の配列で更新する為の関数。 \endif
 	void updateBoneAnimation();			//!< \if ENGLISH \brief A function used to update the model's bone transformation matrices with the current frame of animation. \endif
 										//!< \if JAPANESE \brief モデルのボーン変形行列の配列を更新する為の関数。 \endif

@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <cstdio>
+#include <vector>
 
 
 #include <libmmp.h>
@@ -28,13 +30,15 @@ static bool hasSuffix(const string &str, const char *suffix)
 void printHelpInfo()
 {
 	cout<<"This is PMXViewer, a demonstration using the MikuMikuPenguin library."<<endl
-	<<"Usage: pmx [options] model_file.pmx|model_file.pmd motion_file.vmd"<<endl
+	<<"Usage: pmx [options] model.pmx|model.pmd motion.vmd [model2.pmx motion2.vmd ...]"<<endl
+	<<"Several models can be played together; each VMD belongs to the model before it."<<endl
 	<<"Options: "<<endl
 	<<"  -s\tPlay sound file to go with VMD motion"<<endl
 	<<"\tOnly formats compatible with your build of SDL2_mixer are accepted."<<endl
 	<<"\tIf libmmp was compiled without SDL2_mixer support, no music will play."<<endl<<endl
 	<<"  -c\tCamera motion VMD (camera frames in the motion VMD are used otherwise)"<<endl
 	<<"  -l\tLight motion VMD (otherwise light frames from the -c VMD, then the motion VMD)"<<endl
+	<<"  --pos X,Y,Z\tPosition (MMD coordinates) of the model given just before"<<endl
 	<<"  --loop\tRestart from the beginning at the end of the motion"<<endl
 	<<"  --no-gui\tStart with the on-screen controls hidden (Tab shows them)"<<endl
 	<<"  --help\tdisplay this help and exit"<<endl
@@ -67,8 +71,8 @@ void printVersionInfo()
 
 int main(int argc, char** argv)
 {
-	string model_file="";
-	string motion_file="";
+	vector<ModelSpec> models;
+	vector<string> pendingMotions; //VMDs given before their model
 	string music_file="";
 	string camera_file="";
 	string light_file="";
@@ -106,6 +110,21 @@ int main(int argc, char** argv)
 			{
 				if(count+1<argc) light_file=argv[++count];
 			}
+			else if(string(argv[count]) == "--pos")
+			{
+				//position of the preceding model, in MMD coordinates
+				float x=0, y=0, z=0;
+				if(count+1<argc && sscanf(argv[count+1], "%f,%f,%f", &x, &y, &z)>=1)
+				{
+					++count;
+					if(models.empty()) cerr<<"--pos must follow a model file"<<endl;
+					else models.back().offset=glm::vec3(x, y, -z);
+				}
+				else
+				{
+					cerr<<"--pos needs X,Y,Z"<<endl;
+				}
+			}
 			else if(string(argv[count]) == "-c")
 			{
 				if(count+1<argc) camera_file=argv[++count];
@@ -113,13 +132,22 @@ int main(int argc, char** argv)
 			else
 			{
 				string str=string(argv[count]);
+				//each VMD goes to the last model that has no motion yet
+				//("model1.pmx motion1.vmd model2.pmx motion2.vmd ..."); a VMD
+				//given before its model is kept for the next model
 				if(hasSuffix(str, ".pmx") || hasSuffix(str, ".pmd"))
 				{
-					model_file=str;
+					models.push_back(ModelSpec(str));
+					if(!pendingMotions.empty())
+					{
+						models.back().motionPath=pendingMotions.front();
+						pendingMotions.erase(pendingMotions.begin());
+					}
 				}
 				else if(hasSuffix(str, ".vmd"))
 				{
-					motion_file=str;
+					if(!models.empty() && models.back().motionPath.empty()) models.back().motionPath=str;
+					else pendingMotions.push_back(str);
 				}
 				else
 				{
@@ -134,20 +162,22 @@ int main(int argc, char** argv)
 		return 0;
 	}
 	
-	if(model_file=="")
+	if(models.empty())
 	{
 		cout<<"Did not specify a model file!"<<endl<<endl;
 		printHelpInfo();
 		return 0;
 	}
-	else if(motion_file=="")
+	for(const string &m : pendingMotions)
 	{
-		cout<<"Did not specify a motion file!"<<endl<<endl;
-		printHelpInfo();
-		return 0;
+		cerr<<"WARNING: no model left for motion "<<m<<"; ignored"<<endl;
+	}
+	for(const ModelSpec &m : models)
+	{
+		if(m.motionPath.empty()) cerr<<"Note: "<<m.modelPath<<" has no motion (shown in its rest pose)"<<endl;
 	}
 	
-	Viewer viewer(model_file,motion_file,music_file,camera_file,light_file);
+	Viewer viewer(models,music_file,camera_file,light_file);
 	
 	viewer.setLoop(loop);
 	viewer.setGUI(gui);

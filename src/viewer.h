@@ -11,8 +11,6 @@
 
 #define BUFFER_OFFSET(offset) ((void *) (offset))
 
-enum VAO_IDs { Vertices, NumVAOs };
-enum Buffer_IDs { VertexArrayBuffer, VertexIndexBuffer, RecordBuffer, NumBuffers };
 enum Attrib_IDs { vPosition, vUV, vNormal, vBoneIndices, vBoneWeights, vWeightFormula, vSdefC, vSdefR0, vSdefR1 };
 enum Uniform_IDs { 
 	uAmbient,uDiffuse,uSpecular,uShininess,
@@ -39,11 +37,36 @@ class BulletPhysics;
 class MMDPhysics;
 class VertexData;
 
+//! A model to load: PMX/PMD file, its motion (may be empty) and a position
+struct ModelSpec
+{
+	std::string modelPath;
+	std::string motionPath;
+	glm::vec3 offset; //!< position in OpenGL coordinates
+	ModelSpec(const std::string &m="", const std::string &v=""): modelPath(m), motionPath(v), offset(0.0f) {}
+};
+
+//! One model of the scene with its own motion, physics world and GL buffers
+struct SceneModel
+{
+	ModelSpec spec;
+	ClosedMMDFormat::PMXInfo *pmxInfo;
+	ClosedMMDFormat::VMDInfo *vmdInfo;
+	VMDMotionController *motionController;
+	BulletPhysics *bulletPhysics;
+	MMDPhysics *mmdPhysics;
+	std::vector<GLuint> textures; //the model's textures (shared toons are in Viewer::sharedToon)
+	GLuint vao, vertexBuffer, indexBuffer;
+	glm::vec3 restMin, restMax;   //bounding box of the mesh at rest (model space)
+	glm::vec3 offset;             //position in the scene (editable in the GUI)
+	bool visible;
+};
+
 
 class Viewer
 {
 	public:
-	Viewer(std::string modelPath, std::string motionPath, std::string musicPath="", std::string cameraPath="", std::string lightPath="");
+	Viewer(const std::vector<ModelSpec> &modelSpecs, std::string musicPath="", std::string cameraPath="", std::string lightPath="");
 	~Viewer();
 	
 	void run();
@@ -54,26 +77,35 @@ class Viewer
 	private:
 	void initGLFW();
 	void hackShaderFiles(); //modify #version lines in shader files to match GL version
+	void bindAttribLocations(); //before linking the shader program
 	void initUniformVarLocations();
-	void loadTextures();
-	void initBuffers();
+	void loadSharedTextures();
+	void loadTextures(SceneModel &m);
+	void initBuffers(SceneModel &m);
 	
 	void handleEvents();
 	void handleLogic();
 	void render();
 	void fpsCount();
 	
-	void setCamera(GLuint MVPLoc);
-	void resetCamera(); //frame the whole model (MMD-like front view)
+	void setCamera(); //!< compute projectionMatrix / viewMatrix for this frame
+	void resetCamera(); //frame all models (MMD-like front view)
+	void updateSceneBounds();
 	VMDCameraController cameraController;
 	VMDLightController lightController;
 	bool useLightMotion;
 	bool useCameraMotion;
 	float lastTheta, lastZenith, lastRadius; //to detect manual camera moves
-	glm::vec3 modelMin, modelMax;
-	glm::mat4 viewMatrix, modelViewMatrix;
+	glm::vec3 modelMin, modelMax; //bounds of the whole scene at rest
+	glm::mat4 viewMatrix;
 	bool keyPressed(int key);
 	void handleKey(int key, int mods, bool repeat); //!< key press (or auto-repeat) from the GLFW key callback
+	
+	//***Models
+	std::vector<SceneModel*> models;
+	int currentTime() const; //!< playback time in 1/60 s steps (all models are kept in step)
+	glm::mat4 modelMatrixFor(const SceneModel &m) const;
+	bool modelShown(const SceneModel &m) const;
 	
 	//***Playback control
 	bool paused;
@@ -88,7 +120,7 @@ class Viewer
 	bool physicsEnabled;
 	bool showModel;
 	int debugDrawMode; //0 none, 1 wireframe, 2 AABB, 3 constraints, 4 constraint limits
-	std::string modelPathShown, motionPathShown, cameraPathShown, lightPathShown, musicPathShown;
+	std::string cameraPathShown, lightPathShown, musicPathShown;
 	
 	//***GUI (Dear ImGui; stubs when built without it)
 	bool guiAvailable, guiVisible;
@@ -98,21 +130,20 @@ class Viewer
 	void guiRender();  //!< draw the GUI on top of the scene
 	void shutdownGUI();
 	void updateCameraUniforms();
-	void holdModelInBindPose();
 	
-	void drawModel(bool drawEdges);
+	void drawModel(SceneModel &m, bool drawEdges);
 	
 	//***Shadows
 	bool useGroundShadow, useSelfShadow, hasStencil;
 	GLuint shadowFBO, shadowTexture;
 	int shadowMapSize;
-	glm::mat4 projectionMatrix, modelMatrix, mvpMatrix; //set by setCamera()
+	glm::mat4 projectionMatrix; //set by setCamera()
 	std::vector<std::pair<unsigned,bool>> selfShadowKeys; //VMD self shadow on/off (frame, on)
 	void initShadowMap();
 	MMDLightState currentLight();
 	bool selfShadowActive();
 	glm::mat4 lightViewProjection(const glm::vec3 &lightDir); //world -> light clip space
-	void drawShadowCasters(int renderMode); //geometry only, for the shadow passes
+	void drawShadowCasters(SceneModel &m, int renderMode); //geometry only, for the shadow passes
 	void renderShadowMap(const glm::mat4 &lightVP);
 	void drawGroundShadow(const glm::vec3 &lightDir);
 	
@@ -120,22 +151,13 @@ class Viewer
 	GLFWwindow *window;
 	int framebufferWidth, framebufferHeight;
 
-	GLuint VAOs[NumVAOs];
-	GLuint Buffers[NumBuffers];
 	GLuint uniformVars[NumUniforms];
 
 	GLuint MVP_loc;
 
-	ClosedMMDFormat::PMXInfo *pmxInfo;
-	ClosedMMDFormat::VMDInfo *vmdInfo;
-	VMDMotionController *motionController;
-
-	BulletPhysics *bulletPhysics;
-	MMDPhysics *mmdPhysics;
-
-	std::vector<GLuint> textures;
 	GLuint whiteTexture; //bound when a material has no texture
-	GLuint textureOrWhite(int index);
+	GLuint sharedToon[10]; //toon01.bmp - toon10.bmp
+	GLuint textureOrWhite(const SceneModel &m, int index);
 	
 	//The OpenGL Version hints used that successfully opened the window
 	int GLVersionHintMajor,GLVersionHintMinor;
@@ -150,7 +172,7 @@ class Viewer
 	double startTime;
 	int ticks;
 	
-	glm::vec3 modelTranslate;
+	glm::vec3 modelTranslate; //!< Up/Down keys: moves all models (free camera)
 };
 
 

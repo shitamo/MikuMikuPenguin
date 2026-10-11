@@ -3,7 +3,7 @@
 pmx \- MikuMikuDance PMX/PMD model / VMD motion viewer (MikuMikuPenguin)
 .SH SYNOPSIS
 .B pmx
-[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] [\fB\-\-loop\fR] [\fB\-\-no\-gui\fR] {\fImodel_file.pmx\fR|\fImodel_file.pmd\fR} \fImotion_file.vmd\fR
+[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] [\fB\-\-loop\fR] [\fB\-\-no\-gui\fR] {\fImodel.pmx\fR|\fImodel.pmd\fR} [\fImotion.vmd\fR] [\fB\-\-pos\fR \fIX,Y,Z\fR] [\fImodel2\fR [\fImotion2.vmd\fR] ...]
 .SH DESCRIPTION
 .B pmx
 (PMXViewer) is a demonstration program for the MikuMikuPenguin library
@@ -14,7 +14,17 @@ keys of the motion file are honoured.  Like MMD, the model casts a ground
 shadow and a self shadow (shadow map) following the light.
 .PP
 An OpenGL 3.2 core profile capable driver is required.
+.PP
+Several models can be played together: each VMD file belongs to the model
+given before it (a model without a VMD stays in its rest pose).  All models
+share the time line, the camera and the light; each has its own physics
+(models do not collide with each other).  Motions made for several dancers
+usually contain each dancer's position already.
 .SH OPTIONS
+.TP
+\fB\-\-pos\fR \fIX,Y,Z\fR
+Position of the preceding model, in MMD coordinates (also adjustable in the
+settings panel).
 .TP
 \fB\-s\fR \fIfile\fR
 Play a music file along with the VMD motion.

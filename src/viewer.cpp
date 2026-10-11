@@ -41,10 +41,24 @@ using namespace std;
 using namespace ClosedMMDFormat;
 
 
-Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cameraPath, string lightPath)
+//"dir/model.pmx" -> folder "dir", file "/model.pmx" (as readPMX expects)
+static void splitModelPath(const string &path, string &folder, string &file)
 {
-	modelPathShown=modelPath;
-	motionPathShown=motionPath;
+	size_t index=path.rfind("/");
+	if(index==string::npos)
+	{
+		folder="";
+		file=path;
+	}
+	else
+	{
+		file=path.substr(index);
+		folder=path.substr(0,index);
+	}
+}
+
+Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cameraPath, string lightPath)
+{
 	musicPathShown=musicPath;
 	cameraPathShown=cameraPath;
 	lightPathShown=lightPath;
@@ -54,61 +68,33 @@ Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cam
 	guiAvailable=false;
 	guiVisible=true;
 	guiShowSettings=false;
-
-	int index=modelPath.rfind("/");
-	string modelFilePath,modelFolderPath;
 	
-	if(index==-1)
+	//***Load the files (before opening the window, so errors appear quickly)
+	for(const ModelSpec &spec : modelSpecs)
 	{
-		modelFolderPath="";
-		modelFilePath=modelPath;
+		SceneModel *m=new SceneModel();
+		m->spec=spec;
+		string folder, file;
+		splitModelPath(spec.modelPath, folder, file);
+		m->pmxInfo=&readPMX(folder, file);
+		m->vmdInfo=spec.motionPath.empty() ? new ClosedMMDFormat::VMDInfo() : &readVMD(spec.motionPath);
+		m->offset=spec.offset;
+		m->visible=true;
+		models.push_back(m);
 	}
-	else
-	{
-		modelFilePath=modelPath.substr(index);
-		modelFolderPath=modelPath.substr(0,index);
-	}
-	
-	pmxInfo=&readPMX(modelFolderPath,modelFilePath);
-	vmdInfo=&readVMD(motionPath);
-	//pmxInfo=&readPMX("data/model/gumiv3/","GUMI_V3.pmx");
-	//vmdInfo=&readVMD("data/motion/Watashi no Jikan/私の時間_short_Lat式ミク.vmd");
-	
-	//Below is a test for VMD file-writing. Write the current vmdInfo object to a file, then read back the output into a new vmdInfo object
-	//writeVMD(*vmdInfo,"testVMD.vmd");
-	//vmdInfo=&readVMD("testVMD.vmd");
 	
 	initGLFW();
 	
-	
-	//NOTE: shaderProgram compilation now handled in hackShaderFiles() within initGLFW()
-	/*ifstream test("shaders/model.vert");
-	if(!test.is_open())
-	{
-		shaderProgram=compileShaders(DATA_PATH"/shaders/model.vert",DATA_PATH"/shaders/model.frag");
-	}
-	else
-	{
-		shaderProgram=compileShaders("shaders/model.vert","shaders/model.frag");
-	}
-	test.close();*/
-	
-	
-	
-	loadTextures();
-
-	
-	initBuffers();
+	bindAttribLocations();
 	linkShaders(shaderProgram);
 	glUseProgram(shaderProgram);
 	
-
 	initUniformVarLocations();
 	initShadowMap();
 	initGUI();
 	
 	MVP_loc = glGetUniformLocation(shaderProgram, "MVP");
-    
+	
 	//Set OpenGL render settings
 	glDisable(GL_CULL_FACE);
 	//PMX triangles are clockwise in Direct3D; mirroring Z for OpenGL keeps them
@@ -118,90 +104,101 @@ Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cam
 	glEnable(GL_BLEND);
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glPointSize(5.0);
-	//glClearDepth(1.0f);
-	
-	//glClearColor(0.1f, 0.1f, 0.1f, 0.1f);
 	glClearColor(1,1,1,1);
-	//glDisable(GL_MULTISAMPLE);
 	
-	//Setup MotionController, Physics
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
-	motionController=new VMDMotionController(*pmxInfo,*vmdInfo,shaderProgram);
+	loadSharedTextures();
 	
+	//***Per model: textures, buffers, motion controller and physics.  Every
+	//model has its own Bullet world (models do not collide with each other).
+	for(SceneModel *mp : models)
+	{
+		SceneModel &m=*mp;
+		loadTextures(m);
+		initBuffers(m);
+		
+		glBindBuffer(GL_ARRAY_BUFFER, m.vertexBuffer); //the controller streams vertices into the bound buffer
+		m.motionController=new VMDMotionController(*m.pmxInfo, *m.vmdInfo, shaderProgram);
+		
+		m.bulletPhysics=new BulletPhysics(bulletVertPath, bulletFragPath);
+		glUseProgram(shaderProgram); //restore after BulletPhysics compiled its debug shader
+		m.mmdPhysics=new MMDPhysics(*m.pmxInfo, m.motionController, m.bulletPhysics);
+		
+		m.motionController->updateVertexMorphs();
+		m.motionController->updateBoneAnimation();
+		//Start the physics from the first frame's pose instead of the bind pose
+		m.mmdPhysics->resetToCurrentPose();
+		m.motionController->updateBoneMatrix();
+		
+		//mesh bounding box at rest, used to frame the camera
+		m.restMin=glm::vec3(1e30f); m.restMax=glm::vec3(-1e30f);
+		for(int i=0; i<m.pmxInfo->vertex_continuing_datasets; ++i)
+		{
+			m.restMin=glm::min(m.restMin, m.pmxInfo->vertices[i]->pos);
+			m.restMax=glm::max(m.restMax, m.pmxInfo->vertices[i]->pos);
+		}
+		if(m.pmxInfo->vertex_continuing_datasets==0) { m.restMin=glm::vec3(-10.0f,0.0f,-10.0f); m.restMax=glm::vec3(10.0f,20.0f,10.0f); }
+	}
 	
 	initSound(musicPath);
-	
-	bulletPhysics = new BulletPhysics(bulletVertPath,bulletFragPath);
-	glUseProgram(shaderProgram); //restore GL shader program binding to Viewer's shader program after initializing BulletPhysic's debugDrawer
-	mmdPhysics = new MMDPhysics(*pmxInfo,motionController,bulletPhysics);
-	
-	motionController->updateVertexMorphs();
-	motionController->updateBoneAnimation();
-	
-	//Start the physics from the first frame's pose instead of the bind pose
-	mmdPhysics->resetToCurrentPose();
-	motionController->updateBoneMatrix();
 	
 	//Initialize timer variables
 	startTime = glfwGetTime();
 	ticks=0;
 	
-	//model bounding box at rest, used to frame the camera
-	modelMin=glm::vec3(1e30f); modelMax=glm::vec3(-1e30f);
-	for(int i=0; i<pmxInfo->vertex_continuing_datasets; ++i)
-	{
-		modelMin=glm::min(modelMin, pmxInfo->vertices[i]->pos);
-		modelMax=glm::max(modelMax, pmxInfo->vertices[i]->pos);
-	}
-	if(pmxInfo->vertex_continuing_datasets==0) { modelMin=glm::vec3(-10.0f,0.0f,-10.0f); modelMax=glm::vec3(10.0f,20.0f,10.0f); }
 	modelTranslate=glm::vec3(0.0f);
+	updateSceneBounds();
 	resetCamera();
 	
-	//Camera motion: from a separate camera VMD (-c) or from the motion VMD.
-	//Light motion: from a separate light VMD (-l), else from the camera VMD
-	//(MMD saves camera and light together), else from the motion VMD.
-	cameraController=VMDCameraController(vmdInfo->cameraFrames);
-	lightController=VMDLightController(vmdInfo->lightFrames);
+	//Camera, light and self shadow keys: from the -c (camera) / -l (light)
+	//VMD, otherwise from the first motion VMD that has them.  MMD saves
+	//camera and light together, so the camera VMD also provides the light.
+	ClosedMMDFormat::VMDInfo *camInfo=NULL, *lightInfo=NULL;
 	if(!cameraPath.empty())
 	{
-		ClosedMMDFormat::VMDInfo &camInfo=readVMD(cameraPath);
-		cameraController=VMDCameraController(camInfo.cameraFrames);
-		if(camInfo.cameraFrames.empty()) cerr<<"WARNING: "<<cameraPath<<" contains no camera frames"<<endl;
-		if(!camInfo.lightFrames.empty()) lightController=VMDLightController(camInfo.lightFrames);
+		camInfo=&readVMD(cameraPath);
+		if(camInfo->cameraFrames.empty()) cerr<<"WARNING: "<<cameraPath<<" contains no camera frames"<<endl;
 	}
 	if(!lightPath.empty())
 	{
-		ClosedMMDFormat::VMDInfo &lightInfo=readVMD(lightPath);
-		lightController=VMDLightController(lightInfo.lightFrames);
-		if(lightInfo.lightFrames.empty()) cerr<<"WARNING: "<<lightPath<<" contains no light frames"<<endl;
+		lightInfo=&readVMD(lightPath);
+		if(lightInfo->lightFrames.empty()) cerr<<"WARNING: "<<lightPath<<" contains no light frames"<<endl;
 	}
+	auto firstMotionWith=[&](auto pred)->ClosedMMDFormat::VMDInfo*
+	{
+		for(SceneModel *m : models) if(pred(*m->vmdInfo)) return m->vmdInfo;
+		return NULL;
+	};
+	ClosedMMDFormat::VMDInfo *src;
+	src=camInfo ? camInfo : firstMotionWith([](const ClosedMMDFormat::VMDInfo &v){ return !v.cameraFrames.empty(); });
+	if(src) cameraController=VMDCameraController(src->cameraFrames);
+	src=lightInfo;
+	if(!src && camInfo && !camInfo->lightFrames.empty()) src=camInfo;
+	if(!src) src=firstMotionWith([](const ClosedMMDFormat::VMDInfo &v){ return !v.lightFrames.empty(); });
+	if(src) lightController=VMDLightController(src->lightFrames);
 	useCameraMotion=!cameraController.empty();
 	if(useCameraMotion) cout<<"Using camera motion (press C to toggle)"<<endl;
 	useLightMotion=!lightController.empty();
 	if(useLightMotion) cout<<"Using light motion (press L to toggle)"<<endl;
 	
-	//Shadows (MMD defaults: ground shadow and self shadow on).  The self
-	//shadow on/off keys come from the camera VMD if it has them, otherwise
-	//from the motion VMD.
+	//Shadows (MMD defaults: ground shadow and self shadow on)
 	useGroundShadow=true;
 	useSelfShadow=true;
 	{
-		std::vector<ClosedMMDFormat::VMDSelfShadowFrame> frames=vmdInfo->selfShadowFrames;
-		if(!cameraPath.empty())
-		{
-			ClosedMMDFormat::VMDInfo &camInfo=readVMD(cameraPath);
-			if(!camInfo.selfShadowFrames.empty()) frames=camInfo.selfShadowFrames;
-		}
+		src=(camInfo && !camInfo->selfShadowFrames.empty()) ? camInfo
+		    : firstMotionWith([](const ClosedMMDFormat::VMDInfo &v){ return !v.selfShadowFrames.empty(); });
+		std::vector<ClosedMMDFormat::VMDSelfShadowFrame> frames;
+		if(src) frames=src->selfShadowFrames;
 		std::stable_sort(frames.begin(), frames.end(),
 			[](const ClosedMMDFormat::VMDSelfShadowFrame &a, const ClosedMMDFormat::VMDSelfShadowFrame &b){ return a.frame<b.frame; });
 		for(const auto &f : frames) selfShadowKeys.push_back(std::make_pair(f.frame, f.type!=0));
 	}
 	
-	//Playback: the motion ends at its last key (bone, morph, camera or light)
+	//Playback: the motion ends at its last key (any model, camera or light)
 	paused=false;
 	loopPlayback=false;
 	{
-		unsigned last=motionController->lastKeyFrame();
+		unsigned last=0;
+		for(SceneModel *m : models) last=std::max(last, m->motionController->lastKeyFrame());
 		last=std::max(last, cameraController.lastFrame());
 		last=std::max(last, lightController.lastFrame());
 		endTime=(int)last*2;
@@ -209,11 +206,39 @@ Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cam
 	lastTheta=theta; lastZenith=zenith; lastRadius=radius;
 }
 
+int Viewer::currentTime() const
+{
+	return models.empty() ? 0 : models[0]->motionController->getTime();
+}
+
+glm::mat4 Viewer::modelMatrixFor(const SceneModel &m) const
+{
+	//Up/Down (modelTranslate) only moves the models with the free camera
+	return glm::translate(m.offset + (useCameraMotion ? glm::vec3(0.0f) : modelTranslate));
+}
+
+bool Viewer::modelShown(const SceneModel &m) const
+{
+	//A hides the models; so does the VMD "表示" (show) flag
+	return showModel && m.visible && glfwGetKey(window, GLFW_KEY_A)!=GLFW_PRESS && m.motionController->isModelVisible();
+}
+
+void Viewer::updateSceneBounds()
+{
+	modelMin=glm::vec3(1e30f); modelMax=glm::vec3(-1e30f);
+	for(SceneModel *m : models)
+	{
+		modelMin=glm::min(modelMin, m->restMin+m->offset);
+		modelMax=glm::max(modelMax, m->restMax+m->offset);
+	}
+	if(models.empty()) { modelMin=glm::vec3(-10.0f,0.0f,-10.0f); modelMax=glm::vec3(10.0f,20.0f,10.0f); }
+}
+
 void Viewer::handleLogic()
 {
 	if(!paused)
 	{
-		if(loopPlayback && endTime>0 && motionController->getTime()>=endTime)
+		if(loopPlayback && endTime>0 && currentTime()>=endTime)
 		{
 			seekTo(0);
 		}
@@ -229,60 +254,68 @@ void Viewer::stepLogic()
 {
 	bool doPhysics=physicsEnabled && !keyPressed(GLFW_KEY_Q);
 	
-	if (!motionController->advanceTime())
+	for(SceneModel *m : models)
 	{
-		motionController->updateVertexMorphs();
-		motionController->updateBoneAnimation();
+		if (!m->motionController->advanceTime())
+		{
+			m->motionController->updateVertexMorphs();
+			m->motionController->updateBoneAnimation();
+		}
+		m->mmdPhysics->updateBones(doPhysics);
+		m->motionController->updateBoneMatrix();
 	}
-	//Debug- hold model in bind pose
-	//holdModelInBindPose();
-	
-	mmdPhysics->updateBones(doPhysics);
-	motionController->updateBoneMatrix();
 }
 
 void Viewer::updateCameraUniforms()
 {
-	glUseProgram(bulletPhysics->debugDrawer->shaderProgram);
-	setCamera(bulletPhysics->debugDrawer->MVPLoc);
-	glUseProgram(shaderProgram);
-	setCamera(MVP_loc);
+	setCamera();
 }
 
 void Viewer::seekTo(int t)
 {
 	if(t<0) t=0;
 	if(endTime>0 && t>endTime) t=endTime;
-	motionController->setTime(t);
-	motionController->updateVertexMorphs();
-	motionController->updateBoneAnimation();
-	//physics cannot be run backwards: restart it from the new pose
-	mmdPhysics->resetToCurrentPose();
-	motionController->updateBoneMatrix();
+	for(SceneModel *m : models)
+	{
+		m->motionController->setTime(t);
+		m->motionController->updateVertexMorphs();
+		m->motionController->updateBoneAnimation();
+		//physics cannot be run backwards: restart it from the new pose
+		m->mmdPhysics->resetToCurrentPose();
+		m->motionController->updateBoneMatrix();
+	}
 	soundSeek(t/60.0, paused);
 	updateCameraUniforms();
 }
 
 void Viewer::render()
 {
-	//A hides the model; so does the VMD "表示" (show) flag
-	if(showModel && !keyPressed(GLFW_KEY_A) && motionController->isModelVisible())
+	glUseProgram(shaderProgram);
+	bool anyShown=false;
+	for(SceneModel *m : models) anyShown = anyShown || modelShown(*m);
+	if(anyShown)
 	{
 		MMDLightState light=currentLight();
-		glm::mat4 shadowMVP(1.0f);
-		if(selfShadowActive())
+		glm::mat4 lightVP(1.0f);
+		bool selfShadow=selfShadowActive();
+		if(selfShadow)
 		{
-			glm::mat4 lightVP=lightViewProjection(light.direction);
+			lightVP=lightViewProjection(light.direction);
 			renderShadowMap(lightVP);
-			//clip space [-1,1] -> texture space [0,1]
-			glm::mat4 bias=glm::translate(glm::vec3(0.5f))*glm::scale(glm::vec3(0.5f));
-			shadowMVP=bias*lightVP*modelMatrix;
 		}
-		glUniformMatrix4fv(uniformVars[uShadowMVP],1,GL_FALSE,&shadowMVP[0][0]);
 		if(useGroundShadow) drawGroundShadow(light.direction);
 		
-		drawModel(false); //draw model
-		drawModel(true); //draw outlines (MMD draws them after the model, depth tested)
+		//clip space [-1,1] -> texture space [0,1]
+		glm::mat4 bias=glm::translate(glm::vec3(0.5f))*glm::scale(glm::vec3(0.5f));
+		for(SceneModel *m : models)
+		{
+			if(!modelShown(*m)) continue;
+			glm::mat4 M=modelMatrixFor(*m);
+			glm::mat4 shadowMVP=selfShadow ? bias*lightVP*M : glm::mat4(1.0f);
+			glUniformMatrix4fv(uniformVars[uShadowMVP],1,GL_FALSE,&shadowMVP[0][0]);
+			drawModel(*m, false); //draw model
+			drawModel(*m, true); //draw outlines (MMD draws them after the model, depth tested)
+		}
 		glDisable(GL_CULL_FACE);
 	}
 	
@@ -296,17 +329,16 @@ void Viewer::render()
 	                                btIDebugDraw::DBG_DrawConstraints, btIDebugDraw::DBG_DrawConstraintLimits};
 	if(debugMode>0 && debugMode<5)
 	{
-		bulletPhysics->SetDebugMode(bulletModes[debugMode]);
-		bulletPhysics->DebugDrawWorld();
+		for(SceneModel *m : models)
+		{
+			glUseProgram(m->bulletPhysics->debugDrawer->shaderProgram);
+			glm::mat4 MVP=projectionMatrix*viewMatrix*modelMatrixFor(*m);
+			glUniformMatrix4fv(m->bulletPhysics->debugDrawer->MVPLoc, 1, GL_FALSE, &MVP[0][0]);
+			m->bulletPhysics->SetDebugMode(bulletModes[debugMode]);
+			m->bulletPhysics->DebugDrawWorld();
+		}
 	}
-	glUseProgram(shaderProgram); //Restore shader program and buffer's to Viewer's after drawing Bullet debug
-	glBindVertexArray(VAOs[Vertices]);
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[VertexIndexBuffer]);
-	
-	//glFinish();
-	//glDrawBuffer(RecordBuffer,Buffers);
-	//glReadPixels(0,0,1920,1080,GL_RGB,
+	glUseProgram(shaderProgram); //Restore shader program after drawing Bullet debug
 }
 
 void Viewer::fpsCount()
@@ -330,7 +362,7 @@ void Viewer::fpsCount()
 		int nbf_now = nbf_count % nbf_fps;
 		char title[128];
 		snprintf(title, sizeof(title), "%s | %2d fps | frame %d / %d%s%s", window_name, nb_frames[nbf_now],
-		         std::min(motionController->getTime(), std::max(endTime, 0))/2, endTime/2, paused ? " | paused" : "", loopPlayback ? " | loop" : "");
+		         std::min(currentTime(), std::max(endTime, 0))/2, endTime/2, paused ? " | paused" : "", loopPlayback ? " | loop" : "");
 		glfwSetWindowTitle(window, title);
 		nb_frames[nbf_now] = 0;
 		last_time += seq;
@@ -382,56 +414,36 @@ void Viewer::run()
 	}
 }
 
-void Viewer::setCamera(GLuint MVPLoc)
+void Viewer::setCamera()
 {
 	float aspect = (framebufferWidth>0 && framebufferHeight>0) ? (float)framebufferWidth/(float)framebufferHeight : 16.0f/9.0f;
 	if(useCameraMotion)
 	{
-		MMDCameraState cam=cameraController.evaluate(motionController->getTime()/2.0f);
-		glm::mat4 Projection;
+		MMDCameraState cam=cameraController.evaluate(currentTime()/2.0f);
 		if(cam.perspective)
 		{
-			Projection = glm::perspective(cam.fov, aspect, 0.5f, 5000.0f);
+			projectionMatrix = glm::perspective(cam.fov, aspect, 0.5f, 5000.0f);
 		}
 		else //MMD "perspective OFF": orthographic view of the same size at the interest point
 		{
 			float h = std::abs(cam.distance) * tanf(cam.fov*0.5f);
 			if(h < 0.01f) h = 0.01f;
-			Projection = glm::ortho(-h*aspect, h*aspect, -h, h, -5000.0f, 5000.0f);
+			projectionMatrix = glm::ortho(-h*aspect, h*aspect, -h, h, -5000.0f, 5000.0f);
 		}
-		glm::mat4 View = cam.viewMatrix();
-		glm::mat4 MVP = Projection * View;
-		viewMatrix = View;
-		modelViewMatrix = View;
-		projectionMatrix = Projection;
-		modelMatrix = glm::mat4(1.0f);
-		mvpMatrix = MVP;
-		glUniformMatrix4fv(MVPLoc, 1, GL_FALSE, &MVP[0][0]);
+		viewMatrix = cam.viewMatrix();
 		return;
 	}
 	
 	//MMD's default field of view is 30 degrees
 	float nearPlane = glm::max(radius*0.01f, 0.01f);
 	float farPlane  = radius*20.0f + glm::length(modelMax-modelMin)*4.0f;
-	glm::mat4 Projection = glm::perspective(glm::radians(30.0f), aspect, nearPlane, farPlane);
+	projectionMatrix = glm::perspective(glm::radians(30.0f), aspect, nearPlane, farPlane);
 	// Camera matrix: orbit around cameraTarget
-	glm::mat4 View       = glm::lookAt(
+	viewMatrix = glm::lookAt(
 		cameraTarget + glm::vec3(cameraPosition.x,cameraPosition.y,-cameraPosition.z),
 		cameraTarget,
 		glm::vec3(0,1,0)
 	);
-	//View= glm::rotate(0.0f,0.0f,0.0f,1.0f)* View;
-	// Model matrix : an identity matrix (model will be at the origin)
-	glm::mat4 Model = glm::translate(modelTranslate);
-	// Our ModelViewProjection : multiplication of our 3 matrices
-	glm::mat4 MVP = Projection * View * Model;
-	viewMatrix = View;
-	modelViewMatrix = View * Model;
-	projectionMatrix = Projection;
-	modelMatrix = Model;
-	mvpMatrix = MVP;
-	
-	glUniformMatrix4fv(MVPLoc, 1, GL_FALSE, &MVP[0][0]);
 }
 
 void Viewer::resetCamera()
@@ -448,7 +460,8 @@ void Viewer::resetCamera()
 	float dist=glm::max(fitHeight, fitWidth)*1.15f + size.z*0.5f;
 	if(!(dist>0.0f) || dist>1e6f) dist=45.0f;
 	
-	cameraTarget=glm::vec3(0.0f, centre.y, 0.0f);
+	//a single model is framed on the Y axis, several around their common centre
+	cameraTarget=(models.size()>1) ? centre : glm::vec3(0.0f, centre.y, 0.0f);
 	radius=dist;
 	theta=3.0f*M_PI/2.0f;
 	zenith=0.0f;
@@ -458,12 +471,19 @@ void Viewer::resetCamera()
 	modelTranslate=glm::vec3(0.0f);
 }
 
-void Viewer::drawModel(bool drawEdges)
+void Viewer::drawModel(SceneModel &m, bool drawEdges)
 {
+	ClosedMMDFormat::PMXInfo *pmxInfo=m.pmxInfo;
+	VMDMotionController *motionController=m.motionController;
 	//Bind VAO and related Buffers
-	glBindVertexArray(VAOs[Vertices]);
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[VertexIndexBuffer]);
+	glBindVertexArray(m.vao);
+	glBindBuffer(GL_ARRAY_BUFFER, m.vertexBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.indexBuffer);
+	motionController->bindBoneTexture();
+	glm::mat4 M=modelMatrixFor(m);
+	glm::mat4 modelViewMatrix=viewMatrix*M;
+	glm::mat4 MVP=projectionMatrix*modelViewMatrix;
+	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &MVP[0][0]);
 	
 	if(drawEdges)
 	{
@@ -499,48 +519,48 @@ void Viewer::drawModel(bool drawEdges)
 	
 	bool selfShadowNow=selfShadowActive();
 	int faceCount=0;
-	for(int m=0; m<pmxInfo->material_continuing_datasets; ++m) //pmxInfo->material_continuing_datasets
+	for(int mi=0; mi<pmxInfo->material_continuing_datasets; ++mi) //pmxInfo->material_continuing_datasets
 	{
-		const VMDMotionController::MaterialState &mat=motionController->materialStates[m];
+		const VMDMotionController::MaterialState &mat=motionController->materialStates[mi];
 		
 		//Hidden materials (diffuse alpha 0, typically switched by material
 		//morphs) and materials without edges are skipped.
 		bool skip = mat.diffuse.a <= 0.0f;
-		if(drawEdges && (!pmxInfo->materials[m]->drawEdges || mat.edgeSize <= 0.0f || mat.edgeColor.a <= 0.0f)) skip = true;
+		if(drawEdges && (!pmxInfo->materials[mi]->drawEdges || mat.edgeSize <= 0.0f || mat.edgeColor.a <= 0.0f)) skip = true;
 		if(skip)
 		{
-			faceCount+=pmxInfo->materials[m]->hasFaceNum;
+			faceCount+=pmxInfo->materials[mi]->hasFaceNum;
 			continue;
 		}
 		
 		
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D,textureOrWhite(pmxInfo->materials[m]->textureIndex));
+		glBindTexture(GL_TEXTURE_2D,textureOrWhite(m, pmxInfo->materials[mi]->textureIndex));
 		glUniform1i(uniformVars[uTextureSampler], 0);
 		
-		if((int)pmxInfo->materials[m]->sphereMode>0)
+		if((int)pmxInfo->materials[mi]->sphereMode>0)
 		{
 			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_2D,textureOrWhite(pmxInfo->materials[m]->sphereIndex));
+			glBindTexture(GL_TEXTURE_2D,textureOrWhite(m, pmxInfo->materials[mi]->sphereIndex));
 			glUniform1i(uniformVars[uSphereSampler], 1);
 		}
 		
-		bool hasToon = pmxInfo->materials[m]->shareToon==1 ||
-		               (pmxInfo->materials[m]->toonTextureIndex>=0 && pmxInfo->materials[m]->toonTextureIndex<(int)textures.size()-10);
+		bool hasToon = pmxInfo->materials[mi]->shareToon==1 ||
+		               (pmxInfo->materials[mi]->toonTextureIndex>=0 && pmxInfo->materials[mi]->toonTextureIndex<(int)m.textures.size());
 		glUniform1i(uniformVars[uUseToon], hasToon ? 1 : 0);
 		
-		if((int)pmxInfo->materials[m]->shareToon==0)
+		if((int)pmxInfo->materials[mi]->shareToon==0)
 		{
 			glActiveTexture(GL_TEXTURE2);
 			
-			glBindTexture(GL_TEXTURE_2D,textureOrWhite(pmxInfo->materials[m]->toonTextureIndex));
+			glBindTexture(GL_TEXTURE_2D,textureOrWhite(m, pmxInfo->materials[mi]->toonTextureIndex));
 			glUniform1i(uniformVars[uToonSampler], 2);
 		}
-		else if((int)pmxInfo->materials[m]->shareToon==1)
+		else if((int)pmxInfo->materials[mi]->shareToon==1)
 		{
 			glActiveTexture(GL_TEXTURE2);
 			
-			glBindTexture(GL_TEXTURE_2D,textureOrWhite((int)textures.size()-10+(int)pmxInfo->materials[m]->shareToonTexture));
+			glBindTexture(GL_TEXTURE_2D,sharedToon[pmxInfo->materials[mi]->shareToonTexture%10]);
 			glUniform1i(uniformVars[uToonSampler], 2);
 		}
 		
@@ -562,17 +582,17 @@ void Viewer::drawModel(bool drawEdges)
 		glUniform1f(uniformVars[uEdgeSize],mat.edgeSize);
 		
 		//sphere maps only apply when the material actually has a sphere texture
-		int sphereIdx=pmxInfo->materials[m]->sphereIndex;
-		bool hasSphere = sphereIdx>=0 && sphereIdx<(int)textures.size()-10;
-		glUniform1f(uniformVars[uSphereMode], hasSphere ? (float)pmxInfo->materials[m]->sphereMode : 0.0f);
-		glUniform1i(uniformVars[uSelfShadow], (selfShadowNow && !drawEdges && pmxInfo->materials[m]->drawSelfShadow) ? 1 : 0);
+		int sphereIdx=pmxInfo->materials[mi]->sphereIndex;
+		bool hasSphere = sphereIdx>=0 && sphereIdx<(int)m.textures.size();
+		glUniform1f(uniformVars[uSphereMode], hasSphere ? (float)pmxInfo->materials[mi]->sphereMode : 0.0f);
+		glUniform1i(uniformVars[uSelfShadow], (selfShadowNow && !drawEdges && pmxInfo->materials[mi]->drawSelfShadow) ? 1 : 0);
         
 		if(drawEdges)
 		{
 			glEnable(GL_CULL_FACE); //outline = back faces of the inflated mesh
 			glCullFace(GL_FRONT);
 		}
-		else if(pmxInfo->materials[m]->drawBothSides)
+		else if(pmxInfo->materials[mi]->drawBothSides)
 		{
 			glDisable(GL_CULL_FACE);
 		}
@@ -581,15 +601,15 @@ void Viewer::drawModel(bool drawEdges)
 			glEnable(GL_CULL_FACE);
 			glCullFace(GL_BACK);
 		}
-				glDrawElements(GL_TRIANGLES, (pmxInfo->materials[m]->hasFaceNum), GL_UNSIGNED_INT, BUFFER_OFFSET(sizeof(GLuint)*faceCount));
-		faceCount+=pmxInfo->materials[m]->hasFaceNum;
+				glDrawElements(GL_TRIANGLES, (pmxInfo->materials[mi]->hasFaceNum), GL_UNSIGNED_INT, BUFFER_OFFSET(sizeof(GLuint)*faceCount));
+		faceCount+=pmxInfo->materials[mi]->hasFaceNum;
 	}
 }
 
 
 MMDLightState Viewer::currentLight()
 {
-	return useLightMotion ? lightController.evaluate(motionController->getTime()/2.0f)
+	return useLightMotion ? lightController.evaluate(currentTime()/2.0f)
 	                      : VMDLightController::defaultLight();
 }
 
@@ -597,7 +617,7 @@ bool Viewer::selfShadowActive()
 {
 	if(!useSelfShadow || !shadowFBO) return false;
 	if(selfShadowKeys.empty()) return true;
-	unsigned frame=(unsigned)(motionController->getTime()/2);
+	unsigned frame=(unsigned)(currentTime()/2);
 	bool on=selfShadowKeys.front().second;
 	for(const auto &k : selfShadowKeys)
 	{
@@ -662,16 +682,23 @@ void Viewer::initShadowMap()
 glm::mat4 Viewer::lightViewProjection(const glm::vec3 &lightDir)
 {
 	glm::vec3 bmin(1e30f), bmax(-1e30f);
-	for(int i=0; i<pmxInfo->bone_continuing_datasets; ++i)
+	float margin=0.0f;
+	for(SceneModel *m : models)
 	{
-		glm::vec3 p=glm::vec3(modelMatrix*pmxInfo->bones[i]->calculateGlobalMatrix()[3]);
-		if(!(glm::length(p)<1e6f)) continue; //ignore broken (NaN/far) bones
-		bmin=glm::min(bmin, p);
-		bmax=glm::max(bmax, p);
+		if(!modelShown(*m)) continue;
+		glm::mat4 M=modelMatrixFor(*m);
+		for(int i=0; i<m->pmxInfo->bone_continuing_datasets; ++i)
+		{
+			glm::vec3 p=glm::vec3(M*m->pmxInfo->bones[i]->calculateGlobalMatrix()[3]);
+			if(!(glm::length(p)<1e6f)) continue; //ignore broken (NaN/far) bones
+			bmin=glm::min(bmin, p);
+			bmax=glm::max(bmax, p);
+		}
+		margin=std::max(margin, glm::length(m->restMax-m->restMin)*0.2f);
 	}
 	if(bmin.x>bmax.x) { bmin=modelMin; bmax=modelMax; }
 	glm::vec3 centre=(bmin+bmax)*0.5f;
-	float radius=glm::length(bmax-bmin)*0.5f + glm::length(modelMax-modelMin)*0.2f;
+	float radius=glm::length(bmax-bmin)*0.5f + margin;
 	radius=glm::max(1.0f, ceilf(radius*2.0f)*0.5f);
 	
 	glm::vec3 d=glm::normalize(lightDir);
@@ -682,16 +709,19 @@ glm::mat4 Viewer::lightViewProjection(const glm::vec3 &lightDir)
 	float texel=2.0f*radius/shadowMapSize;
 	c.x=floorf(c.x/texel)*texel;
 	c.y=floorf(c.y/texel)*texel;
-	//view space looks down -Z: the model is around z=c.z
+	//view space looks down -Z: the models are around z=c.z
 	glm::mat4 lightProj=glm::ortho(c.x-radius, c.x+radius, c.y-radius, c.y+radius, -c.z-3.0f*radius, -c.z+3.0f*radius);
 	return lightProj*lightView;
 }
 
-void Viewer::drawShadowCasters(int renderMode)
+void Viewer::drawShadowCasters(SceneModel &model, int renderMode)
 {
-	glBindVertexArray(VAOs[Vertices]);
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[VertexIndexBuffer]);
+	ClosedMMDFormat::PMXInfo *pmxInfo=model.pmxInfo;
+	VMDMotionController *motionController=model.motionController;
+	glBindVertexArray(model.vao);
+	glBindBuffer(GL_ARRAY_BUFFER, model.vertexBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model.indexBuffer);
+	motionController->bindBoneTexture();
 	glUniform1i(uniformVars[uIsEdge], 0);
 	glUniform1i(uniformVars[uRenderMode], renderMode);
 	
@@ -724,14 +754,17 @@ void Viewer::renderShadowMap(const glm::mat4 &lightVP)
 	glEnable(GL_POLYGON_OFFSET_FILL);
 	glPolygonOffset(1.5f, 4.0f);
 	
-	glm::mat4 MVP=lightVP*modelMatrix;
-	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &MVP[0][0]);
-	drawShadowCasters(1);
+	for(SceneModel *m : models)
+	{
+		if(!modelShown(*m)) continue;
+		glm::mat4 MVP=lightVP*modelMatrixFor(*m);
+		glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &MVP[0][0]);
+		drawShadowCasters(*m, 1);
+	}
 	
 	glDisable(GL_POLYGON_OFFSET_FILL);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, framebufferWidth, framebufferHeight);
-	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &mvpMatrix[0][0]);
 }
 
 //MMD's ground shadow: the model flattened onto the y=0 plane along the light
@@ -744,8 +777,6 @@ void Viewer::drawGroundShadow(const glm::vec3 &lightDir)
 	flatten[1][0]=-d.x/d.y;
 	flatten[1][1]=0.0f;
 	flatten[1][2]=-d.z/d.y;
-	glm::mat4 MVP=projectionMatrix*viewMatrix*flatten*modelMatrix;
-	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &MVP[0][0]);
 	
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
@@ -759,16 +790,36 @@ void Viewer::drawGroundShadow(const glm::vec3 &lightDir)
 		glStencilFunc(GL_EQUAL, 0, 0xFF);
 		glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
 	}
-	drawShadowCasters(2);
+	for(SceneModel *m : models)
+	{
+		if(!modelShown(*m)) continue;
+		glm::mat4 MVP=projectionMatrix*viewMatrix*flatten*modelMatrixFor(*m);
+		glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &MVP[0][0]);
+		drawShadowCasters(*m, 2);
+	}
 	if(hasStencil) glDisable(GL_STENCIL_TEST);
 	glDepthMask(GL_TRUE);
-	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &mvpMatrix[0][0]);
 }
 
 
 //#define MODELDUMP
-void Viewer::initBuffers()
+//Fixed attribute indices (must be set before the shader program is linked)
+void Viewer::bindAttribLocations()
 {
+	glBindAttribLocation(shaderProgram, vPosition, "vPosition");
+	glBindAttribLocation(shaderProgram, vUV, "vUV");
+	glBindAttribLocation(shaderProgram, vNormal, "vNormal");
+	glBindAttribLocation(shaderProgram, vBoneIndices, "vBoneIndices");
+	glBindAttribLocation(shaderProgram, vBoneWeights, "vBoneWeights");
+	glBindAttribLocation(shaderProgram, vWeightFormula, "vWeightFormula");
+	glBindAttribLocation(shaderProgram, vSdefC, "vSdefC");
+	glBindAttribLocation(shaderProgram, vSdefR0, "vSdefR0");
+	glBindAttribLocation(shaderProgram, vSdefR1, "vSdefR1");
+}
+
+void Viewer::initBuffers(SceneModel &m)
+{
+	ClosedMMDFormat::PMXInfo *pmxInfo=m.pmxInfo;
 	#ifdef MODELDUMP
 	ofstream modeldump("modeldump.txt");
 	modeldump << "indices:" << endl;
@@ -798,57 +849,48 @@ void Viewer::initBuffers()
 	modeldump.close();
 	#endif
 	
-	//Generate all Viewer Buffers
-	glGenBuffers(NumBuffers,Buffers);
+	//Generate the model's buffers
+	glGenBuffers(1, &m.vertexBuffer);
+	glGenBuffers(1, &m.indexBuffer);
 	
 	//init Element Buffer Object
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[VertexIndexBuffer]);
+	glGenVertexArrays(1, &m.vao);
+	glBindVertexArray(m.vao);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.indexBuffer);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, pmxInfo->face_continuing_datasets*sizeof(GLuint)*3, vertexIndices, GL_STATIC_DRAW);
 	
 	free(vertexIndices);
 	
 	
 	//Init Vertex Array Buffer Object
-	glGenVertexArrays(NumVAOs, VAOs);
-	glBindVertexArray(VAOs[Vertices]);
-	
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
+	glBindBuffer(GL_ARRAY_BUFFER, m.vertexBuffer);
 	
 	//Intialize Vertex Attribute Pointers
 	glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(0)); //4=number of components updated per vertex
-	glBindAttribLocation(shaderProgram, vPosition, "vPosition"); //Explicit vertex attribute index specification for older OpenGL version support. (Newer method is layout qualifier in vertex shader)
 	glEnableVertexAttribArray(vPosition);
 
 	glVertexAttribPointer(vUV, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(glm::vec4)));
-	glBindAttribLocation(shaderProgram, vUV, "vUV");
 	glEnableVertexAttribArray(vUV);
 
 	glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(glm::vec4)+sizeof(glm::vec2)));
-	glBindAttribLocation(shaderProgram, vNormal, "vNormal");
 	glEnableVertexAttribArray(vNormal);
 
 	glVertexAttribPointer(vBoneIndices, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(glm::vec4)+sizeof(glm::vec2)+sizeof(glm::vec3)+sizeof(GLfloat)));
-	glBindAttribLocation(shaderProgram, vBoneIndices, "vBoneIndices");
 	glEnableVertexAttribArray(vBoneIndices);
 
 	glVertexAttribPointer(vBoneWeights, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(glm::vec4)+sizeof(glm::vec2)+sizeof(glm::vec3)+sizeof(GLfloat)*5));
-	glBindAttribLocation(shaderProgram, vBoneWeights, "vBoneWeights");
 	glEnableVertexAttribArray(vBoneWeights);
 
 	glVertexAttribPointer(vWeightFormula, 1, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(glm::vec4)+sizeof(glm::vec2)+sizeof(glm::vec3)));
-	glBindAttribLocation(shaderProgram, vWeightFormula, "vWeightFormula");
 	glEnableVertexAttribArray(vWeightFormula);
 
 	glVertexAttribPointer(vSdefC, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(offsetof(VertexData, sdefC)));
-	glBindAttribLocation(shaderProgram, vSdefC, "vSdefC");
 	glEnableVertexAttribArray(vSdefC);
 
 	glVertexAttribPointer(vSdefR0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(offsetof(VertexData, sdefR0)));
-	glBindAttribLocation(shaderProgram, vSdefR0, "vSdefR0");
 	glEnableVertexAttribArray(vSdefR0);
 
 	glVertexAttribPointer(vSdefR1, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(offsetof(VertexData, sdefR1)));
-	glBindAttribLocation(shaderProgram, vSdefR1, "vSdefR1");
 	glEnableVertexAttribArray(vSdefR1);
 }
 
@@ -943,7 +985,7 @@ static bool hasExtension(const string &path, const char *ext)
 	return path.size()>=n && strcasecmp(path.c_str()+path.size()-n, ext)==0;
 }
 
-void Viewer::loadTextures()
+void Viewer::loadSharedTextures()
 {
 	//1x1 white texture used for materials without a (valid) texture
 	{
@@ -956,14 +998,7 @@ void Viewer::loadTextures()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	}
 	
-	for(int i=0; i<pmxInfo->texture_continuing_datasets; ++i)
-	{
-		const string &path=pmxInfo->texturePaths[i];
-		bool rgba = hasExtension(path,"png") || hasExtension(path,"spa") || hasExtension(path,"tga");
-		textures.push_back(loadTextureFile(path, rgba));
-	}
-	
-	//Shared toon textures toon01.bmp - toon10.bmp (always the last 10 entries)
+	//Shared toon textures toon01.bmp - toon10.bmp
 	for(int i=1; i<=10; ++i)
 	{
 		char name[16];
@@ -974,13 +1009,21 @@ void Viewer::loadTextures()
 		{
 			loc=string(DATA_PATH)+"/textures/"+name;
 		}
-		textures.push_back(loadTextureFile(loc, true, false));
+		sharedToon[i-1]=loadTextureFile(loc, true, false);
+	}
+}
+
+void Viewer::loadTextures(SceneModel &m)
+{
+	for(int i=0; i<m.pmxInfo->texture_continuing_datasets; ++i)
+	{
+		const string &path=m.pmxInfo->texturePaths[i];
+		bool rgba = hasExtension(path,"png") || hasExtension(path,"spa") || hasExtension(path,"tga");
+		m.textures.push_back(loadTextureFile(path, rgba));
 	}
 }
 
 
-//Load the shader files (a "shaders/" directory in the current directory
-//takes precedence over the installed copies).
 void Viewer::hackShaderFiles()
 {
 	ifstream test("shaders/model.vert");
@@ -1085,11 +1128,12 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action, i
 	}
 }
 
-GLuint Viewer::textureOrWhite(int index)
+GLuint Viewer::textureOrWhite(const SceneModel &m, int index)
 {
-	if(index<0 || index>=(int)textures.size()) return whiteTexture;
-	return textures[index];
+	if(index<0 || index>=(int)m.textures.size()) return whiteTexture;
+	return m.textures[index];
 }
+
 
 void Viewer::initUniformVarLocations()
 {
@@ -1188,10 +1232,10 @@ void Viewer::handleKey(int key, int mods, bool repeat)
 		
 		//Left/Right: seek 1 s (30 frames), with Shift 10 s
 		case GLFW_KEY_RIGHT:
-			seekTo(motionController->getTime()+(shift ? 600 : 60));
+			seekTo(currentTime()+(shift ? 600 : 60));
 			break;
 		case GLFW_KEY_LEFT:
-			seekTo(motionController->getTime()-(shift ? 600 : 60));
+			seekTo(currentTime()-(shift ? 600 : 60));
 			break;
 		
 		//Home/End: beginning / end of the motion
@@ -1217,7 +1261,7 @@ void Viewer::setPaused(bool p)
 	if(p==paused) return;
 	paused=p;
 	soundSetPaused(paused);
-	cout<<(paused ? "Paused" : "Playing")<<" at frame "<<motionController->getTime()/2<<endl;
+	cout<<(paused ? "Paused" : "Playing")<<" at frame "<<currentTime()/2<<endl;
 }
 
 void Viewer::stepFrame(int direction)
@@ -1227,12 +1271,12 @@ void Viewer::stepFrame(int direction)
 	{
 		stepLogic(); //forward steps keep the physics running continuously
 		stepLogic();
-		soundSeek(motionController->getTime()/60.0, true);
+		soundSeek(currentTime()/60.0, true);
 		updateCameraUniforms();
 	}
 	else
 	{
-		seekTo(motionController->getTime()-2);
+		seekTo(currentTime()-2);
 	}
 }
 
@@ -1267,26 +1311,4 @@ void Viewer::handleEvents()
 		modelTranslate.y+=radius*0.005f;
 	}
 }
-
-void Viewer::holdModelInBindPose()
-{
-	for(unsigned i = 0; i<pmxInfo->bone_continuing_datasets; i++)
-	{
-		PMXBone *b=pmxInfo->bones[i];
-		
-		if(b->parentBoneIndex!=-1)
-		{
-			PMXBone *parent = pmxInfo->bones[b->parentBoneIndex];
-			b->Local = glm::translate( b->position - parent->position );
-		}
-		else
-		{
-			b->Local = glm::translate( b->position );
-		}
-	
-		motionController->skinMatrix[i] = b->calculateGlobalMatrix()*motionController->invBindPose[i];
-	}
-	motionController->updateBoneMatrix();
-}
-
 

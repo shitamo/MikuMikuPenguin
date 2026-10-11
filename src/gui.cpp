@@ -190,7 +190,7 @@ void Viewer::guiFrame()
 	{
 		const ImGuiViewport *vp=ImGui::GetMainViewport();
 		const ImGuiStyle &style=ImGui::GetStyle();
-		int frame=std::min(motionController->getTime(), std::max(endTime, 0))/2;
+		int frame=std::min(currentTime(), std::max(endTime, 0))/2;
 		int endFrame=std::max(endTime/2, 0);
 
 		//***Playback bar***
@@ -223,7 +223,7 @@ void Viewer::guiFrame()
 			};
 			if(button("|<", T("Beginning (Home)", "先頭へ (Home)"))) seekTo(0);
 			if(button("<<", T("Back 1 s (Left, Shift: 10 s)", "1秒戻る (←, Shift+←で10秒)")))
-				seekTo(motionController->getTime()-(ImGui::GetIO().KeyShift ? 600 : 60));
+				seekTo(currentTime()-(ImGui::GetIO().KeyShift ? 600 : 60));
 			if(button("<", T("Previous frame (,)", "1コマ戻る (,)"))) stepFrame(-1);
 			{
 				//fixed width so that the bar does not jump when the label changes
@@ -235,7 +235,7 @@ void Viewer::guiFrame()
 			}
 			if(button(">", T("Next frame (.)", "1コマ進む (.)"))) stepFrame(+1);
 			if(button(">>", T("Forward 1 s (Right, Shift: 10 s)", "1秒進む (→, Shift+→で10秒)")))
-				seekTo(motionController->getTime()+(ImGui::GetIO().KeyShift ? 600 : 60));
+				seekTo(currentTime()+(ImGui::GetIO().KeyShift ? 600 : 60));
 			if(button(">|", T("End (End)", "末尾へ (End)"))) seekTo(endTime);
 
 			ImGui::Checkbox(T("Loop", "ループ"), &loopPlayback);
@@ -270,8 +270,33 @@ void Viewer::guiFrame()
 						if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", path.c_str());
 						if(!extra.empty()) { ImGui::SameLine(); ImGui::TextDisabled("(%s)", extra.c_str()); }
 					};
-					fileRow(T("Model", "モデル"), modelPathShown, pmxInfo->modelName);
-					fileRow(T("Motion", "モーション"), motionPathShown, "");
+					//one block per model: files, show/hide, position
+					for(size_t i=0; i<models.size(); ++i)
+					{
+						SceneModel &m=*models[i];
+						ImGui::PushID((int)i);
+						ImGui::Checkbox("##visible", &m.visible);
+						if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", T("Show this model", "このモデルを表示"));
+						ImGui::SameLine();
+						ImGui::Text("%s: %s", T("Model", "モデル"), baseName(m.spec.modelPath).c_str());
+						if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", m.spec.modelPath.c_str());
+						if(!m.pmxInfo->modelName.empty()) { ImGui::SameLine(); ImGui::TextDisabled("(%s)", m.pmxInfo->modelName.c_str()); }
+						ImGui::Indent();
+						fileRow(T("Motion", "モーション"), m.spec.motionPath.empty() ? string(T("(none)", "（なし）")) : m.spec.motionPath, "");
+						if(models.size()>1 || m.offset!=glm::vec3(0.0f))
+						{
+							//shown in MMD coordinates (Z is mirrored)
+							float pos[3]={m.offset.x, m.offset.y, -m.offset.z};
+							ImGui::SetNextItemWidth(ImGui::CalcTextSize("0000000").x*3.0f);
+							if(ImGui::DragFloat3(T("Position", "位置"), pos, 0.05f, -1000.0f, 1000.0f, "%.2f"))
+							{
+								m.offset=glm::vec3(pos[0], pos[1], -pos[2]);
+								updateSceneBounds();
+							}
+						}
+						ImGui::Unindent();
+						ImGui::PopID();
+					}
 					fileRow(T("Camera", "カメラ"), cameraPathShown, "");
 					fileRow(T("Light", "照明"), lightPathShown, "");
 					fileRow(T("Music", "音楽"), musicPathShown, "");
@@ -291,7 +316,7 @@ void Viewer::guiFrame()
 					ImGui::Checkbox(T("Ground shadow (Z)", "地面影 (Z)"), &useGroundShadow);
 					ImGui::Checkbox(T("Self shadow (X)", "セルフシャドウ (X)"), &useSelfShadow);
 					ImGui::Checkbox(T("Physics", "物理演算"), &physicsEnabled);
-					ImGui::Checkbox(T("Show model", "モデルを表示"), &showModel);
+					ImGui::Checkbox(models.size()>1 ? T("Show models", "モデルを表示") : T("Show model", "モデルを表示"), &showModel);
 
 					const char *debugItems[]={
 						T("None", "なし"), T("Wireframe (S)", "ワイヤーフレーム (S)"), T("AABB (D)", "AABB (D)"),
