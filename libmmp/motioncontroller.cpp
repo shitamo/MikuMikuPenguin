@@ -5,6 +5,7 @@
 
 #include <sstream>
 #include <iostream>
+#include <algorithm>
 
 #define GLM_FORCE_RADIANS
 
@@ -77,6 +78,29 @@ VMDMotionController::VMDMotionController(PMXInfo &pmxInfo,VMDInfo &vmdInfo,GLuin
 		ite_boneKeyFrames.push_back(boneKeyFrames[i].begin());
 		boneRot.push_back(glm::quat(1, 0, 0, 0));
 		bonePos.push_back(glm::vec3(0, 0, 0));
+	}
+	
+	//***INIT SHOW/IK FRAMES (model visibility and IK on/off; step keys)***
+	ikEnableKeys.resize(pmxInfo.bone_continuing_datasets);
+	{
+		std::vector<VMDShowIKFrame> frames=vmdInfo.showIKFrames;
+		std::stable_sort(frames.begin(), frames.end(),
+			[](const VMDShowIKFrame &a, const VMDShowIKFrame &b){ return a.frame<b.frame; });
+		for(const VMDShowIKFrame &f : frames)
+		{
+			visibleKeys.push_back(std::make_pair(f.frame, f.show));
+			for(const VMDIKInfo &ik : f.IKList)
+			{
+				for(unsigned j=0; j<pmxInfo.bone_continuing_datasets; ++j)
+				{
+					if(pmxInfo.bones[j]->IK && pmxInfo.bones[j]->name==ik.name)
+					{
+						ikEnableKeys[j].push_back(std::make_pair(f.frame, ik.isOn));
+						break;
+					}
+				}
+			}
+		}
 	}
 	
 	#ifdef MODELDUMP
@@ -594,6 +618,30 @@ void VMDMotionController::applyInheritance(int i, std::vector<char> &state)
 
 
 
+//Value of a step key track at frame (the first key's value before it; true without keys)
+static bool stepValue(const std::vector<std::pair<unsigned,bool>> &keys, unsigned frame)
+{
+	if(keys.empty()) return true;
+	bool v=keys.front().second;
+	for(const auto &k : keys)
+	{
+		if(k.first>frame) break;
+		v=k.second;
+	}
+	return v;
+}
+
+bool VMDMotionController::isModelVisible() const
+{
+	return stepValue(visibleKeys, (unsigned)(time/2));
+}
+
+bool VMDMotionController::isIKEnabled(int boneIndex) const
+{
+	if(boneIndex<0 || boneIndex>=(int)ikEnableKeys.size()) return true;
+	return stepValue(ikEnableKeys[boneIndex], (unsigned)(time/2));
+}
+
 void VMDMotionController::updateIK()
 {
 	glm::vec4 effectorPos;
@@ -616,7 +664,7 @@ void VMDMotionController::updateIK()
 	{
 		PMXBone *IKBone=pmxInfo.bones[b];
 
-		if(IKBone->IK) //IKフラグをチェック
+		if(IKBone->IK && isIKEnabled(b)) //IKフラグをチェック (VMD can switch IK off)
 		{
 			//cout<<IKBone->name<<endl;
 			

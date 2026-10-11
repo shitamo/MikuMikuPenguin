@@ -6,6 +6,7 @@
 
 #include "motioncontroller.h"
 #include "cameracontroller.h"
+#include "lightcontroller.h"
 #include "interpolation.h"
 
 #include "bulletphysics.h"

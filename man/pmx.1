@@ -3,12 +3,14 @@
 pmx \- MikuMikuDance PMX model / VMD motion viewer (MikuMikuPenguin)
 .SH SYNOPSIS
 .B pmx
-[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] \fImodel_file.pmx motion_file.vmd\fR
+[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] \fImodel_file.pmx motion_file.vmd\fR
 .SH DESCRIPTION
 .B pmx
 (PMXViewer) is a demonstration program for the MikuMikuPenguin library
 (libmmp).  It loads a PMX 2.0 model and plays a VMD motion on it, with
 Bullet physics for hair, skirts and other rigid bodies.
+Camera and light motion are played, and the model visibility and IK on/off
+keys of the motion file are honoured.
 .PP
 An OpenGL 3.2 core profile capable driver is required.
 .SH OPTIONS
@@ -20,6 +22,10 @@ Only formats supported by SDL2_mixer are accepted.
 \fB\-c\fR \fIfile\fR
 Camera motion (a VMD file with camera frames).  Without this option the
 camera frames contained in the motion file, if any, are used.
+.TP
+\fB\-l\fR \fIfile\fR
+Light motion (a VMD file with light frames).  Without this option the light
+frames of the \fB\-c\fR file are used, then those of the motion file.
 .TP
 \fB\-\-help\fR
 display help and exit
@@ -48,6 +54,9 @@ Bullet debug drawing (wireframe, AABB, constraints, constraint limits)
 .TP
 .B C
 toggle the VMD camera motion (moving the camera with the mouse switches to the free camera)
+.TP
+.B L
+toggle the VMD light motion (off: MMD default light)
 .TP
 .B R
 reset the camera (front view framing the whole model)

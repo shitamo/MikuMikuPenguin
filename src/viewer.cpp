@@ -38,7 +38,7 @@ using namespace std;
 using namespace ClosedMMDFormat;
 
 
-Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cameraPath)
+Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cameraPath, string lightPath)
 {
 	int index=modelPath.rfind("/");
 	string modelFilePath,modelFolderPath;
@@ -140,19 +140,28 @@ Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cam
 	modelTranslate=glm::vec3(0.0f);
 	resetCamera();
 	
-	//Camera motion: from a separate camera VMD (-c) or from the motion VMD
+	//Camera motion: from a separate camera VMD (-c) or from the motion VMD.
+	//Light motion: from a separate light VMD (-l), else from the camera VMD
+	//(MMD saves camera and light together), else from the motion VMD.
+	cameraController=VMDCameraController(vmdInfo->cameraFrames);
+	lightController=VMDLightController(vmdInfo->lightFrames);
 	if(!cameraPath.empty())
 	{
 		ClosedMMDFormat::VMDInfo &camInfo=readVMD(cameraPath);
 		cameraController=VMDCameraController(camInfo.cameraFrames);
 		if(camInfo.cameraFrames.empty()) cerr<<"WARNING: "<<cameraPath<<" contains no camera frames"<<endl;
+		if(!camInfo.lightFrames.empty()) lightController=VMDLightController(camInfo.lightFrames);
 	}
-	else
+	if(!lightPath.empty())
 	{
-		cameraController=VMDCameraController(vmdInfo->cameraFrames);
+		ClosedMMDFormat::VMDInfo &lightInfo=readVMD(lightPath);
+		lightController=VMDLightController(lightInfo.lightFrames);
+		if(lightInfo.lightFrames.empty()) cerr<<"WARNING: "<<lightPath<<" contains no light frames"<<endl;
 	}
 	useCameraMotion=!cameraController.empty();
 	if(useCameraMotion) cout<<"Using camera motion (press C to toggle)"<<endl;
+	useLightMotion=!lightController.empty();
+	if(useLightMotion) cout<<"Using light motion (press L to toggle)"<<endl;
 	lastTheta=theta; lastZenith=zenith; lastRadius=radius;
 }
 
@@ -186,7 +195,8 @@ void Viewer::handleLogic()
 
 void Viewer::render()
 {
-	if(!keyPressed(GLFW_KEY_A))
+	//A hides the model; so does the VMD "表示" (show) flag
+	if(!keyPressed(GLFW_KEY_A) && motionController->isModelVisible())
 	{
 		drawModel(false); //draw model
 		drawModel(true); //draw outlines (MMD draws them after the model, depth tested)
@@ -398,10 +408,12 @@ void Viewer::drawModel(bool drawEdges)
 	//MMD default light: colour (154,154,154), direction (-0.5,-1.0,0.5) in MMD
 	//(left-handed) coordinates = (-0.5,-1.0,-0.5) here.  Lighting is done in
 	//view space.
-	glm::vec3 lightDirWorld=glm::normalize(glm::vec3(-0.5f,-1.0f,-0.5f));
-	glm::vec3 lightDirView=glm::normalize(glm::mat3(viewMatrix)*lightDirWorld);
+	//VMD light motion replaces both when enabled.
+	MMDLightState light = useLightMotion ? lightController.evaluate(motionController->getTime()/2.0f)
+	                                     : VMDLightController::defaultLight();
+	glm::vec3 lightDirView=glm::normalize(glm::mat3(viewMatrix)*light.direction);
 	glUniform3f(uniformVars[uLightDirection],lightDirView.x,lightDirView.y,lightDirView.z);
-	glUniform3f(uniformVars[uLightColor],154.0f/255.0f,154.0f/255.0f,154.0f/255.0f);
+	glUniform3f(uniformVars[uLightColor],light.color.r,light.color.g,light.color.b);
 	glUniformMatrix4fv(uniformVars[uMV],1,GL_FALSE,&modelViewMatrix[0][0]);
 	glUniform2f(uniformVars[uScreenSize],(float)framebufferWidth,(float)framebufferHeight);
 	
@@ -859,6 +871,16 @@ void Viewer::handleEvents()
 		cout<<(useCameraMotion ? "Camera motion ON" : "Camera motion OFF (free camera)")<<endl;
 	}
 	cWasDown=cDown;
+	
+	//L toggles the VMD light motion (edge-triggered)
+	static bool lWasDown=false;
+	bool lDown=glfwGetKey(window, GLFW_KEY_L)==GLFW_PRESS;
+	if(lDown && !lWasDown && !lightController.empty())
+	{
+		useLightMotion=!useLightMotion;
+		cout<<(useLightMotion ? "Light motion ON" : "Light motion OFF (MMD default light)")<<endl;
+	}
+	lWasDown=lDown;
 	
 	//moving the camera with the mouse switches to the free camera
 	if(useCameraMotion && (theta!=lastTheta || zenith!=lastZenith || radius!=lastRadius))

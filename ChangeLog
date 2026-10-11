@@ -1,3 +1,9 @@
+October 11, 2026 (light motion, IK on/off):
+-VMD light motion (colour and direction, linear between keys) from -l,
+ the -c camera VMD or the motion VMD; L toggles it
+-VMD show/IK frames: IK bones switched off in the motion are not solved
+ (the FK keys are used), and the model is hidden while "表示" is off
+
 October 11, 2026 (camera motion):
 -VMD camera motion playback (MMD conventions: interest point, distance,
  rotation, view angle, perspective/orthographic, per-channel bezier

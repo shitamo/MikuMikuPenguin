@@ -107,6 +107,11 @@ class VMDMotionController
 	//! Current animation time in 1/60 s steps (VMD frame = time/2)
 	int getTime() const { return time; }
 	
+	//! Model visibility from the VMD "show/IK" frames ("表示") at the current time
+	bool isModelVisible() const;
+	//! Whether the IK of bone boneIndex is enabled by the VMD "show/IK" frames at the current time
+	bool isIKEnabled(int boneIndex) const;
+	
 	private:
 	int time;
 	
@@ -141,6 +146,10 @@ class VMDMotionController
 	std::vector<std::list<ClosedMMDFormat::VMDMorphFrame>::iterator> ite_morphKeyFrames;	//Keyframe iterator
 	
 	std::vector<float> vMorphWeights;
+	
+	//***SHOW/IK FRAMES (step keys: frame, value)
+	std::vector<std::vector<std::pair<unsigned,bool>>> ikEnableKeys; //per bone (only IK bones named in the VMD)
+	std::vector<std::pair<unsigned,bool>> visibleKeys;
 };
 
 /*! \struct VertexData

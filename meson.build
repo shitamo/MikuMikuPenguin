@@ -74,6 +74,7 @@ libmmp = library('mmp',
   'libmmp/shader.cpp',
   'libmmp/glm_helper.cpp',
   'libmmp/cameracontroller.cpp',
+  'libmmp/lightcontroller.cpp',
   include_directories : mmp_inc,
   dependencies : mmp_deps,
   install : true)
@@ -92,6 +93,7 @@ install_headers(
   'include/motioncontroller.h',
   'include/interpolation.h',
   'include/cameracontroller.h',
+  'include/lightcontroller.h',
   subdir : 'libmmp')
 
 pkg = import('pkgconfig')

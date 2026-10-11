@@ -34,6 +34,7 @@ void printHelpInfo()
 	<<"\tOnly formats compatible with your build of SDL2_mixer are accepted."<<endl
 	<<"\tIf libmmp was compiled without SDL2_mixer support, no music will play."<<endl<<endl
 	<<"  -c\tCamera motion VMD (camera frames in the motion VMD are used otherwise)"<<endl
+	<<"  -l\tLight motion VMD (otherwise light frames from the -c VMD, then the motion VMD)"<<endl
 	<<"  --help\tdisplay this help and exit"<<endl
 	<<"  --version\toutput version information and exit"<<endl<<endl
 	<<"Controls:"<<endl
@@ -41,6 +42,7 @@ void printHelpInfo()
 	<<"  Up/Down\tmove model          Q (hold)\tpause physics"<<endl
 	<<"  A (hold)\thide model          S/D/F/G (hold)\tBullet debug drawing"<<endl
 	<<"  R\t\treset camera       C\tcamera motion on/off"<<endl
+	<<"  L\t\tlight motion on/off"<<endl
 	<<"  Esc\t\tquit"<<endl<<endl
 	<<"FOR JAPANESE DOCUMENTATION, SEE:"<<endl
 	<<"<file://"<<DATA_PATH<<"/doc/README_JP.html>"<<endl<<endl
@@ -62,6 +64,7 @@ int main(int argc, char** argv)
 	string motion_file="";
 	string music_file="";
 	string camera_file="";
+	string light_file="";
 	
 	int count=0;
 	if(argc > 1)
@@ -81,6 +84,10 @@ int main(int argc, char** argv)
 			else if(string(argv[count]) == "-s")
 			{
 				if(count+1<argc) music_file=argv[++count];
+			}
+			else if(string(argv[count]) == "-l")
+			{
+				if(count+1<argc) light_file=argv[++count];
 			}
 			else if(string(argv[count]) == "-c")
 			{
@@ -123,7 +130,7 @@ int main(int argc, char** argv)
 		return 0;
 	}
 	
-	Viewer viewer(model_file,motion_file,music_file,camera_file);
+	Viewer viewer(model_file,motion_file,music_file,camera_file,light_file);
 	
 	viewer.run();
 	
