@@ -104,6 +104,9 @@ class VMDMotionController
 										//!< \if JAPANESE \brief モデルが出来ている頂点の配列へのポインター。 \endif
 	
 	
+	//! Current animation time in 1/60 s steps (VMD frame = time/2)
+	int getTime() const { return time; }
+	
 	private:
 	int time;
 	

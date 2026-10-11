@@ -55,11 +55,12 @@ namespace ClosedMMDFormat
 		glm::vec3 position;
 		glm::vec3 rotation;
 		
-		//TODO: Read Camera Frame Bezier Parameters correctly
+		//6 cubic Bezier curves (interest X, Y, Z, rotation, distance, view
+		//angle), 4 bytes each: x1, x2, y1, y2 in [0,127]
 		char interpolationParameters[24];
 		
 		unsigned int viewAngle; //viewing angle in degrees
-		bool perspective; //0:ON 1:OFF
+		bool perspective; //as stored in the file: false(0) = perspective ON, true(1) = OFF
 	};
 
 	struct VMDLightFrame

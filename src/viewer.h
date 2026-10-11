@@ -3,6 +3,7 @@
 
 #include "mmp_gl.h"
 #include "mmp_glm.h"
+#include "cameracontroller.h"
 
 #include <vector>
 #include <string>
@@ -37,7 +38,7 @@ class VertexData;
 class Viewer
 {
 	public:
-	Viewer(std::string modelPath, std::string motionPath, std::string musicPath="");
+	Viewer(std::string modelPath, std::string motionPath, std::string musicPath="", std::string cameraPath="");
 	~Viewer();
 	
 	void run();
@@ -57,6 +58,9 @@ class Viewer
 	
 	void setCamera(GLuint MVPLoc);
 	void resetCamera(); //frame the whole model (MMD-like front view)
+	VMDCameraController cameraController;
+	bool useCameraMotion;
+	float lastTheta, lastZenith, lastRadius; //to detect manual camera moves
 	glm::vec3 modelMin, modelMax;
 	glm::mat4 viewMatrix, modelViewMatrix;
 	bool keyPressed(int key);

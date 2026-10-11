@@ -8,6 +8,7 @@
 #include "texthandle.h"
 
 #include <string.h>
+#include <cstdint>
 #include <cstdlib>
 
 using namespace std;
@@ -172,23 +173,28 @@ namespace ClosedMMDFormat
 		{
 			VMDCameraFrame *f = &vmdInfo.cameraFrames[i];
 			
+			//61 bytes: frame, distance, interest point, rotation (radians),
+			//24 bytes of interpolation, view angle (degrees), perspective flag
 			miku.read((char*)&f->frame, 4);
+			miku.read((char*)&f->distance, 4);
 			
 			miku.read((char*)&f->position.x, 4);
 			miku.read((char*)&f->position.y, 4);
 			miku.read((char*)&f->position.z, 4);
-			f->position.z = -f->position.z;
+			f->position.z = -f->position.z; //Direct3D -> OpenGL
 			
+			//Euler angles in radians, kept as stored in the file; see
+			//VMDCameraController for how they are applied.
 			miku.read((char*)&f->rotation.x, 4);
 			miku.read((char*)&f->rotation.y, 4);
 			miku.read((char*)&f->rotation.z, 4);
 			
-			//WARNING!!!! IS f->rotation a set of Euler Angles? (Probably yes)
-			//If so, we should be performing Quaternion Mirroring like in pmx.cpp:506
+			miku.read(f->interpolationParameters, 24);
 			
-			//!\todo Read Camera Frame Bezier Parameters correctly
-			char bezier[24];
-			miku.read((char*)&bezier, 24);
+			miku.read((char*)&f->viewAngle, 4);
+			uint8_t perspective = 0;
+			miku.read((char*)&perspective, 1);
+			f->perspective = perspective; //0: perspective ON, 1: OFF (as stored)
 		}
 		cout<<"done."<<endl;	
 		
@@ -394,20 +400,18 @@ namespace ClosedMMDFormat
 			glm::vec3 position=f->position;
 			position.z=-position.z; //Flip Z-axis back to DirectX (left-handed) coordinate form
 			
-			//WARNING!!!! IS f->rotation a set of Euler Angles? (Probably yes)
-			//If so, we should be performing Quaternion Mirroring like in pmx.cpp:506
-			
-			char bezier[24]; //!\todo  Write Camera Frame Bezier Parameters correctly
-			
+			miku.write((char*)&f->frame,4);
+			miku.write((char*)&f->distance,4);
 			miku.write((char*)&position.x,4);
 			miku.write((char*)&position.y,4);
 			miku.write((char*)&position.z,4);
-			
 			miku.write((char*)&f->rotation.x,4);
 			miku.write((char*)&f->rotation.y,4);
 			miku.write((char*)&f->rotation.z,4);
-			
-			miku.write(bezier,24); //!\todo  Write Camera Frame Bezier Parameters correctly
+			miku.write(f->interpolationParameters,24);
+			miku.write((char*)&f->viewAngle,4);
+			uint8_t perspective = f->perspective ? 1 : 0;
+			miku.write((char*)&perspective,1);
 		}
 		
 		unsigned lightCount=vmdInfo.lightFrames.size();

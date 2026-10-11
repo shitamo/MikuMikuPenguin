@@ -38,7 +38,7 @@ using namespace std;
 using namespace ClosedMMDFormat;
 
 
-Viewer::Viewer(string modelPath, string motionPath,string musicPath)
+Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cameraPath)
 {
 	int index=modelPath.rfind("/");
 	string modelFilePath,modelFolderPath;
@@ -139,6 +139,21 @@ Viewer::Viewer(string modelPath, string motionPath,string musicPath)
 	if(pmxInfo->vertex_continuing_datasets==0) { modelMin=glm::vec3(-10.0f,0.0f,-10.0f); modelMax=glm::vec3(10.0f,20.0f,10.0f); }
 	modelTranslate=glm::vec3(0.0f);
 	resetCamera();
+	
+	//Camera motion: from a separate camera VMD (-c) or from the motion VMD
+	if(!cameraPath.empty())
+	{
+		ClosedMMDFormat::VMDInfo &camInfo=readVMD(cameraPath);
+		cameraController=VMDCameraController(camInfo.cameraFrames);
+		if(camInfo.cameraFrames.empty()) cerr<<"WARNING: "<<cameraPath<<" contains no camera frames"<<endl;
+	}
+	else
+	{
+		cameraController=VMDCameraController(vmdInfo->cameraFrames);
+	}
+	useCameraMotion=!cameraController.empty();
+	if(useCameraMotion) cout<<"Using camera motion (press C to toggle)"<<endl;
+	lastTheta=theta; lastZenith=zenith; lastRadius=radius;
 }
 
 void Viewer::handleLogic()
@@ -285,6 +300,28 @@ void Viewer::run()
 void Viewer::setCamera(GLuint MVPLoc)
 {
 	float aspect = (framebufferWidth>0 && framebufferHeight>0) ? (float)framebufferWidth/(float)framebufferHeight : 16.0f/9.0f;
+	if(useCameraMotion)
+	{
+		MMDCameraState cam=cameraController.evaluate(motionController->getTime()/2.0f);
+		glm::mat4 Projection;
+		if(cam.perspective)
+		{
+			Projection = glm::perspective(cam.fov, aspect, 0.5f, 5000.0f);
+		}
+		else //MMD "perspective OFF": orthographic view of the same size at the interest point
+		{
+			float h = std::abs(cam.distance) * tanf(cam.fov*0.5f);
+			if(h < 0.01f) h = 0.01f;
+			Projection = glm::ortho(-h*aspect, h*aspect, -h, h, -5000.0f, 5000.0f);
+		}
+		glm::mat4 View = cam.viewMatrix();
+		glm::mat4 MVP = Projection * View;
+		viewMatrix = View;
+		modelViewMatrix = View;
+		glUniformMatrix4fv(MVPLoc, 1, GL_FALSE, &MVP[0][0]);
+		return;
+	}
+	
 	//MMD's default field of view is 30 degrees
 	float nearPlane = glm::max(radius*0.01f, 0.01f);
 	float farPlane  = radius*20.0f + glm::length(modelMax-modelMin)*4.0f;
@@ -810,7 +847,26 @@ void Viewer::handleEvents()
 	if(keyPressed(GLFW_KEY_R))
 	{
 		resetCamera();
+		useCameraMotion=false;
 	}
+	
+	//C toggles the VMD camera motion (edge-triggered)
+	static bool cWasDown=false;
+	bool cDown=glfwGetKey(window, GLFW_KEY_C)==GLFW_PRESS;
+	if(cDown && !cWasDown && !cameraController.empty())
+	{
+		useCameraMotion=!useCameraMotion;
+		cout<<(useCameraMotion ? "Camera motion ON" : "Camera motion OFF (free camera)")<<endl;
+	}
+	cWasDown=cDown;
+	
+	//moving the camera with the mouse switches to the free camera
+	if(useCameraMotion && (theta!=lastTheta || zenith!=lastZenith || radius!=lastRadius))
+	{
+		useCameraMotion=false;
+		cout<<"Camera motion OFF (free camera; press C to resume)"<<endl;
+	}
+	lastTheta=theta; lastZenith=zenith; lastRadius=radius;
 		if(keyPressed(GLFW_KEY_UP))
 	{
 		modelTranslate.y-=radius*0.005f;

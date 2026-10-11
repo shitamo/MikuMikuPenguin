@@ -457,10 +457,11 @@ void VMDMotionController::updateBoneAnimation()
 			boneRot[i] = q0 = (*ite_boneKeyFrames[i]).rotation;
 			bonePos[i] = p0 = (*ite_boneKeyFrames[i]).translation;
 			
-			const BezierParameters &bez=(*ite_boneKeyFrames[i]).bezier;
-			
 			if(++ite_boneKeyFrames[i] != boneKeyFrames[i].end())
 			{
+				//The interpolation curve stored in a VMD key describes the
+				//transition INTO that key, so use the destination key's curve.
+				const BezierParameters &bez=(*ite_boneKeyFrames[i]).bezier;
 				t1 = (*ite_boneKeyFrames[i]).frame*2; //MMD=30fps, this program=60fps, 60/30=2
 				q1 = (*ite_boneKeyFrames[i]).rotation;
 				p1 = (*ite_boneKeyFrames[i]).translation;

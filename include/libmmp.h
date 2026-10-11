@@ -5,6 +5,7 @@
 #include "vmd.h"
 
 #include "motioncontroller.h"
+#include "cameracontroller.h"
 #include "interpolation.h"
 
 #include "bulletphysics.h"

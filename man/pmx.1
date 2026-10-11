@@ -3,7 +3,7 @@
 pmx \- MikuMikuDance PMX model / VMD motion viewer (MikuMikuPenguin)
 .SH SYNOPSIS
 .B pmx
-[\fIoptions\fR] \fImodel_file.pmx motion_file.vmd\fR
+[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] \fImodel_file.pmx motion_file.vmd\fR
 .SH DESCRIPTION
 .B pmx
 (PMXViewer) is a demonstration program for the MikuMikuPenguin library
@@ -16,6 +16,10 @@ An OpenGL 3.2 core profile capable driver is required.
 \fB\-s\fR \fIfile\fR
 Play a music file along with the VMD motion.
 Only formats supported by SDL2_mixer are accepted.
+.TP
+\fB\-c\fR \fIfile\fR
+Camera motion (a VMD file with camera frames).  Without this option the
+camera frames contained in the motion file, if any, are used.
 .TP
 \fB\-\-help\fR
 display help and exit
@@ -41,6 +45,9 @@ hide the model
 .TP
 .B S, D, F, G (hold)
 Bullet debug drawing (wireframe, AABB, constraints, constraint limits)
+.TP
+.B C
+toggle the VMD camera motion (moving the camera with the mouse switches to the free camera)
 .TP
 .B R
 reset the camera (front view framing the whole model)

@@ -1,3 +1,14 @@
+October 11, 2026 (camera motion):
+-VMD camera motion playback (MMD conventions: interest point, distance,
+ rotation, view angle, perspective/orthographic, per-channel bezier
+ interpolation, cuts between adjacent keys). Camera keys in the motion
+ VMD are used, or a separate camera VMD given with -c; C toggles camera
+ motion, moving the camera with the mouse/keys switches to the free camera
+-Fixed the VMD camera section reader (records are 61 bytes, only 44 were
+ read) and writer
+-Bone interpolation now uses the curve stored in the destination key, as
+ MMD does
+
 October 10, 2026 (merge of weimingtom/MMP v0.2.1):
 -Rebased the modernisation onto upstream v0.2.1 (IK angle limits, type 2
  rigid bodies, D3D->OpenGL conversion fixes, VMD writer, more VMD
