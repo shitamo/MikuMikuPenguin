@@ -1,3 +1,5 @@
+October 11, 2026: version 0.2.1+GLFW3 (pmx --version, libmmp.pc, Debian)
+
 October 11, 2026 (opening files from the GUI):
 -File menu on the playback bar (add model, motion for a model, camera /
  light motion, music, and removing them), per-model "load motion",

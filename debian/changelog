@@ -1,3 +1,11 @@
+mikumikupenguin (0.2.1+GLFW3) unstable; urgency=medium
+
+  * New version number 0.2.1+GLFW3 for the modernised tree (v0.2.1 with
+    GLFW 3 and everything listed below); also shown by pmx --version and
+    in libmmp.pc.
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 22:20:00 +0900
+
 mikumikupenguin (0.2.1+20261011.15) unstable; urgency=medium
 
   * README: drop the sentence about not accepting reports.

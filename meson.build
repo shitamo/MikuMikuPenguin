@@ -1,5 +1,5 @@
 project('mikumikupenguin', 'cpp',
-  version : '0.2.1',
+  version : '0.2.1+GLFW3',
   license : 'GPL-3.0-only',
   meson_version : '>= 0.60.0',
   default_options : [
@@ -88,6 +88,7 @@ if not gui_opt.disabled()
   endif
 endif
 
+conf.set_quoted('MMP_VERSION', meson.project_version())
 configure_file(output : 'config.h', configuration : conf)
 
 # ---------------------------------------------------------------- libmmp

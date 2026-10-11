@@ -1,3 +1,9 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+#ifndef MMP_VERSION
+#define MMP_VERSION "0.2.1+GLFW3"
+#endif
 //g++ *.cpp src/*.cpp src/*.cc -o pmx -I/usr/include/bullet -lglfw -lepoxy -lGL -lSDL2 -lSDL2_mixer -ggdb -lBulletDynamics -lBulletCollision -lLinearMath -lBulletSoftBody -std=c++11
 #include <iostream>
 #include <fstream>
@@ -63,7 +69,7 @@ void printHelpInfo()
 
 void printVersionInfo()
 {
-	cout<<"PMXViewer v0.2.1"<<endl
+	cout<<"PMXViewer v"<<MMP_VERSION<<endl
 	<<"Copyright (C) 2014 Ben Clapp (sn0w75)"<<endl
      <<"This is free software; see the source for copying conditions.  There is NO"<<endl
      <<"warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."<<endl
