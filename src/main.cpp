@@ -36,6 +36,7 @@ void printHelpInfo()
 	<<"  -c\tCamera motion VMD (camera frames in the motion VMD are used otherwise)"<<endl
 	<<"  -l\tLight motion VMD (otherwise light frames from the -c VMD, then the motion VMD)"<<endl
 	<<"  --loop\tRestart from the beginning at the end of the motion"<<endl
+	<<"  --no-gui\tStart with the on-screen controls hidden (Tab shows them)"<<endl
 	<<"  --help\tdisplay this help and exit"<<endl
 	<<"  --version\toutput version information and exit"<<endl<<endl
 	<<"Controls:"<<endl
@@ -48,6 +49,7 @@ void printHelpInfo()
 	<<"  Space\t\tpause/resume       O\tloop on/off"<<endl
 	<<"  Left/Right\tseek 1 s (Shift: 10 s)   , .\tone frame back/forward"<<endl
 	<<"  Home/End\tbeginning/end of the motion"<<endl
+	<<"  Tab\t\tshow/hide the on-screen controls"<<endl
 	<<"  Esc\t\tquit"<<endl<<endl
 	<<"FOR JAPANESE DOCUMENTATION, SEE:"<<endl
 	<<"<file://"<<DATA_PATH<<"/doc/README_JP.html>"<<endl<<endl
@@ -71,6 +73,7 @@ int main(int argc, char** argv)
 	string camera_file="";
 	string light_file="";
 	bool loop=false;
+	bool gui=true;
 	
 	int count=0;
 	if(argc > 1)
@@ -90,6 +93,10 @@ int main(int argc, char** argv)
 			else if(string(argv[count]) == "-s")
 			{
 				if(count+1<argc) music_file=argv[++count];
+			}
+			else if(string(argv[count]) == "--no-gui")
+			{
+				gui=false;
 			}
 			else if(string(argv[count]) == "--loop")
 			{
@@ -143,6 +150,7 @@ int main(int argc, char** argv)
 	Viewer viewer(model_file,motion_file,music_file,camera_file,light_file);
 	
 	viewer.setLoop(loop);
+	viewer.setGUI(gui);
 	viewer.run();
 	
 	delete pmxvLogger::get();	

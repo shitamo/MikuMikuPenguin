@@ -48,6 +48,7 @@ class Viewer
 	
 	void run();
 	void setLoop(bool loop) { loopPlayback=loop; } //!< restart from the beginning at the end of the motion
+	void setGUI(bool enable) { guiVisible=enable; } //!< show the on-screen controls
 		
 	
 	private:
@@ -80,6 +81,22 @@ class Viewer
 	int endTime;        //!< end of the motion in 1/60 s steps (last key)
 	void seekTo(int t); //!< jump to time t (1/60 s steps) and reset the physics to that pose
 	void stepLogic();   //!< advance the animation and physics by one 1/60 s step
+	void setPaused(bool p);
+	void stepFrame(int direction); //!< one VMD frame forward (+1) or back (-1), pausing playback
+	
+	//***Display options (keys and GUI)
+	bool physicsEnabled;
+	bool showModel;
+	int debugDrawMode; //0 none, 1 wireframe, 2 AABB, 3 constraints, 4 constraint limits
+	std::string modelPathShown, motionPathShown, cameraPathShown, lightPathShown, musicPathShown;
+	
+	//***GUI (Dear ImGui; stubs when built without it)
+	bool guiAvailable, guiVisible;
+	bool guiShowSettings;
+	void initGUI();
+	void guiFrame();   //!< build the GUI for this frame (may change the playback state)
+	void guiRender();  //!< draw the GUI on top of the scene
+	void shutdownGUI();
 	void updateCameraUniforms();
 	void holdModelInBindPose();
 	

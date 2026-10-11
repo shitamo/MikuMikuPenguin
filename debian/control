@@ -12,6 +12,8 @@ Build-Depends: debhelper-compat (= 13),
                libglm-dev,
                libbullet-dev,
                libstb-dev,
+               libimgui-dev,
+               libfontconfig-dev,
                libsdl3-mixer-dev | libsdl2-mixer-dev
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
@@ -20,6 +22,7 @@ Homepage: https://github.com/weimingtom/MMP
 Package: mikumikupenguin
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: fonts-noto-cjk | fonts-ipafont-gothic | fonts-vlgothic
 Description: MikuMikuDance PMX/PMD/VMD viewer for Linux
  MikuMikuPenguin is a library (libmmp) and a demonstration viewer for
  MikuMikuDance (MMD) data.  The viewer, pmx, loads a PMX 2.0 or PMD model and

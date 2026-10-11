@@ -3,7 +3,7 @@
 pmx \- MikuMikuDance PMX/PMD model / VMD motion viewer (MikuMikuPenguin)
 .SH SYNOPSIS
 .B pmx
-[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] [\fB\-\-loop\fR] {\fImodel_file.pmx\fR|\fImodel_file.pmd\fR} \fImotion_file.vmd\fR
+[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] [\fB\-\-loop\fR] [\fB\-\-no\-gui\fR] {\fImodel_file.pmx\fR|\fImodel_file.pmd\fR} \fImotion_file.vmd\fR
 .SH DESCRIPTION
 .B pmx
 (PMXViewer) is a demonstration program for the MikuMikuPenguin library
@@ -32,12 +32,22 @@ frames of the \fB\-c\fR file are used, then those of the motion file.
 Restart from the beginning when the end of the motion (its last key) is
 reached.
 .TP
+\fB\-\-no\-gui\fR
+Start with the on-screen controls hidden (\fBTab\fR shows them).
+.TP
 \fB\-\-help\fR
 display help and exit
 .TP
 \fB\-\-version\fR
 output version information and exit
 .SH CONTROLS
+A playback bar (play/pause, seek, frame step, timeline, loop) is shown at the
+bottom of the window, and its \fBSettings\fR button opens a panel with the
+display options and a list of these shortcuts.  The labels are Japanese when
+the locale is Japanese and a Japanese font is installed.
+.TP
+.B Tab
+show / hide the on-screen controls
 .TP
 .B Left mouse drag
 rotate the camera

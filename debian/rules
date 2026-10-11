@@ -9,7 +9,7 @@ export DEB_CXXFLAGS_MAINT_APPEND = -Wno-sign-compare -Wno-unused-variable -Wno-u
 # libmmp has no stable API/ABI yet, so it is built as a static library only
 # (meson default_library=static) and the viewer links against it.
 override_dh_auto_configure:
-	dh_auto_configure -- -Dsound=enabled
+	dh_auto_configure -- -Dsound=enabled -Dgui=enabled
 
 # Remove leftovers of the former autotools build system (in-tree
 # ./configure && make from older versions), which are not part of the source.

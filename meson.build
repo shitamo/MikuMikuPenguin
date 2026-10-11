@@ -56,6 +56,38 @@ if not sound_opt.disabled()
     endif
   endif
 endif
+
+# On-screen controls: Dear ImGui with its GLFW + OpenGL 3 backends (Debian's
+# libimgui-dev ships them in libimgui.a); fontconfig finds a Japanese font.
+gui_opt = get_option('gui')
+gui_deps = []
+gui_enabled = false
+if not gui_opt.disabled()
+  imgui_dep = dependency('imgui', required : false)
+  if imgui_dep.found()
+    imgui_ok = cxx.links('''
+      #include <imgui.h>
+      #include <backends/imgui_impl_glfw.h>
+      #include <backends/imgui_impl_opengl3.h>
+      int main() { ImGui::CreateContext(); ImGui_ImplGlfw_InitForOpenGL(nullptr, true);
+                   ImGui_ImplOpenGL3_Init("#version 150"); return 0; }
+      ''', dependencies : [imgui_dep, glfw_dep], name : 'Dear ImGui GLFW/OpenGL3 backends')
+    if imgui_ok
+      gui_deps = [imgui_dep]
+      gui_enabled = true
+      conf.set('MMP_GUI', 1)
+      fontconfig_dep = dependency('fontconfig', required : false)
+      if fontconfig_dep.found()
+        gui_deps += fontconfig_dep
+        conf.set('MMP_FONTCONFIG', 1)
+      endif
+    endif
+  endif
+  if not gui_enabled and gui_opt.enabled()
+    error('gui enabled, but Dear ImGui (with the GLFW/OpenGL3 backends) was not found')
+  endif
+endif
+
 configure_file(output : 'config.h', configuration : conf)
 
 # ---------------------------------------------------------------- libmmp
@@ -122,6 +154,7 @@ pmx_sources = [
   'src/pmxvLogger.cpp',
   'src/viewer.cpp',
   'src/glfw_func_callbacks.cpp',
+  'src/gui.cpp',
 ]
 if sound_backend != 'none'
   pmx_sources += 'src/sound.cpp'
@@ -132,7 +165,7 @@ endif
 executable('pmx', pmx_sources,
   include_directories : include_directories('src'),
   cpp_args : ['-DHAVE_CONFIG_H', '-DDATA_PATH="@0@"'.format(pkgdatadir)],
-  dependencies : [libmmp_dep, stb_dep, sound_deps],
+  dependencies : [libmmp_dep, stb_dep, sound_deps, gui_deps],
   install : true)
 
 # ---------------------------------------------------------------- data
@@ -157,5 +190,6 @@ test('glm_helper', glm_helper_test)
 summary({
   'C++ standard' : get_option('cpp_std'),
   'Sound' : sound_backend,
+  'GUI' : gui_enabled,
   'Data directory' : pkgdatadir,
 }, section : 'MikuMikuPenguin')

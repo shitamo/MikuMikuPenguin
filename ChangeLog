@@ -1,3 +1,12 @@
+October 11, 2026 (GUI):
+-On-screen controls with Dear ImGui: a playback bar (beginning, -1 s,
+ -1 frame, play/pause, +1 frame, +1 s, end, timeline slider, loop, time)
+ and a settings panel (files, camera/light motion, ground/self shadow,
+ physics, model visibility, rigid body display, model height, camera
+ reset, list of keyboard shortcuts). Japanese labels with a Japanese
+ locale (font found with fontconfig). Tab or --no-gui hides them.
+ meson option gui (auto); camera dragging ignores the mouse on the GUI
+
 October 11, 2026 (shadows):
 -Ground shadow: the model flattened onto y=0 along the light, drawn once
  per pixel with the stencil buffer (materials with the ground shadow flag)

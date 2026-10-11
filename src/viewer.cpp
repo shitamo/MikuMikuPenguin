@@ -43,6 +43,18 @@ using namespace ClosedMMDFormat;
 
 Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cameraPath, string lightPath)
 {
+	modelPathShown=modelPath;
+	motionPathShown=motionPath;
+	musicPathShown=musicPath;
+	cameraPathShown=cameraPath;
+	lightPathShown=lightPath;
+	physicsEnabled=true;
+	showModel=true;
+	debugDrawMode=0;
+	guiAvailable=false;
+	guiVisible=true;
+	guiShowSettings=false;
+
 	int index=modelPath.rfind("/");
 	string modelFilePath,modelFolderPath;
 	
@@ -93,6 +105,7 @@ Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cam
 
 	initUniformVarLocations();
 	initShadowMap();
+	initGUI();
 	
 	MVP_loc = glGetUniformLocation(shaderProgram, "MVP");
     
@@ -214,7 +227,7 @@ void Viewer::handleLogic()
 
 void Viewer::stepLogic()
 {
-	bool doPhysics=!keyPressed(GLFW_KEY_Q);
+	bool doPhysics=physicsEnabled && !keyPressed(GLFW_KEY_Q);
 	
 	if (!motionController->advanceTime())
 	{
@@ -253,7 +266,7 @@ void Viewer::seekTo(int t)
 void Viewer::render()
 {
 	//A hides the model; so does the VMD "表示" (show) flag
-	if(!keyPressed(GLFW_KEY_A) && motionController->isModelVisible())
+	if(showModel && !keyPressed(GLFW_KEY_A) && motionController->isModelVisible())
 	{
 		MMDLightState light=currentLight();
 		glm::mat4 shadowMVP(1.0f);
@@ -273,24 +286,17 @@ void Viewer::render()
 		glDisable(GL_CULL_FACE);
 	}
 	
-	if(keyPressed(GLFW_KEY_S))
+	//Bullet debug drawing: selected in the GUI, or while S/D/F/G is held
+	int debugMode=debugDrawMode;
+	if(keyPressed(GLFW_KEY_S)) debugMode=1;
+	else if(keyPressed(GLFW_KEY_D)) debugMode=2;
+	else if(keyPressed(GLFW_KEY_F)) debugMode=3;
+	else if(keyPressed(GLFW_KEY_G)) debugMode=4;
+	static const int bulletModes[]={0, btIDebugDraw::DBG_DrawWireframe, btIDebugDraw::DBG_DrawAabb,
+	                                btIDebugDraw::DBG_DrawConstraints, btIDebugDraw::DBG_DrawConstraintLimits};
+	if(debugMode>0 && debugMode<5)
 	{
-		bulletPhysics->SetDebugMode(btIDebugDraw::DBG_DrawWireframe);
-		bulletPhysics->DebugDrawWorld();
-	}
-	else if(keyPressed(GLFW_KEY_D))
-	{
-		bulletPhysics->SetDebugMode(btIDebugDraw::DBG_DrawAabb);
-		bulletPhysics->DebugDrawWorld();
-	}
-	else if(keyPressed(GLFW_KEY_F))
-	{
-		bulletPhysics->SetDebugMode(btIDebugDraw::DBG_DrawConstraints);
-		bulletPhysics->DebugDrawWorld();
-	}
-	else if(keyPressed(GLFW_KEY_G))
-	{
-		bulletPhysics->SetDebugMode(btIDebugDraw::DBG_DrawConstraintLimits);
+		bulletPhysics->SetDebugMode(bulletModes[debugMode]);
 		bulletPhysics->DebugDrawWorld();
 	}
 	glUseProgram(shaderProgram); //Restore shader program and buffer's to Viewer's after drawing Bullet debug
@@ -370,6 +376,7 @@ void Viewer::run()
 			updateCameraUniforms();
 		}
 		render();
+		guiRender();
 		
 		glfwSwapBuffers(window);
 	}
@@ -1124,6 +1131,7 @@ void Viewer::initUniformVarLocations()
 
 Viewer::~Viewer()
 {
+	shutdownGUI();
 	if(window) glfwDestroyWindow(window);
 	glfwTerminate();
 }
@@ -1162,9 +1170,13 @@ void Viewer::handleKey(int key, int mods, bool repeat)
 		//Space: pause / resume
 		case GLFW_KEY_SPACE:
 			if(repeat) break;
-			paused=!paused;
-			soundSetPaused(paused);
-			cout<<(paused ? "Paused" : "Playing")<<" at frame "<<motionController->getTime()/2<<endl;
+			setPaused(!paused);
+			break;
+		
+		//Tab: show / hide the on-screen controls
+		case GLFW_KEY_TAB:
+			if(repeat) break;
+			guiVisible=!guiVisible;
 			break;
 		
 		//O: loop on/off
@@ -1192,22 +1204,42 @@ void Viewer::handleKey(int key, int mods, bool repeat)
 		
 		//Period/Comma: one frame forward/back (pauses playback)
 		case GLFW_KEY_PERIOD:
-			if(!paused) { paused=true; soundSetPaused(true); }
-			stepLogic(); //forward steps keep the physics running continuously
-			stepLogic();
-			soundSeek(motionController->getTime()/60.0, true);
-			updateCameraUniforms();
+			stepFrame(+1);
 			break;
 		case GLFW_KEY_COMMA:
-			if(!paused) { paused=true; soundSetPaused(true); }
-			seekTo(motionController->getTime()-2);
+			stepFrame(-1);
 			break;
+	}
+}
+
+void Viewer::setPaused(bool p)
+{
+	if(p==paused) return;
+	paused=p;
+	soundSetPaused(paused);
+	cout<<(paused ? "Paused" : "Playing")<<" at frame "<<motionController->getTime()/2<<endl;
+}
+
+void Viewer::stepFrame(int direction)
+{
+	if(!paused) { paused=true; soundSetPaused(true); }
+	if(direction>0)
+	{
+		stepLogic(); //forward steps keep the physics running continuously
+		stepLogic();
+		soundSeek(motionController->getTime()/60.0, true);
+		updateCameraUniforms();
+	}
+	else
+	{
+		seekTo(motionController->getTime()-2);
 	}
 }
 
 void Viewer::handleEvents()
 {
 	glfwPollEvents();
+	guiFrame();
 	if(keyPressed(GLFW_KEY_R))
 	{
 		resetCamera();

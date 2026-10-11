@@ -17,6 +17,9 @@ extern glm::vec3 cameraTarget;
 extern int prevX,prevY;
 extern int prevWheel;
 
+//set every frame by the GUI: the mouse is over / dragging a GUI widget
+extern bool guiCapturesMouse;
+
 extern float zoomStep;
 extern float minRadius;
 

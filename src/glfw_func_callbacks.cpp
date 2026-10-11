@@ -21,6 +21,8 @@ int prevX=0,prevY=0;
 int prevWheel=0;
 
 
+bool guiCapturesMouse=false;
+
 float zoomStep=1.0f;   //mouse wheel step (set from the model size)
 float minRadius=1.0f;
 
@@ -35,6 +37,7 @@ void updateCameraPosition()
 void mouseWheel(GLFWwindow *window, double xoffset, double yoffset)
 {
 	(void)window; (void)xoffset;
+	if(guiCapturesMouse) return;
 	if(yoffset>0) radius-=zoomStep; //up: zoom in
 	else if(yoffset<0) radius+=zoomStep; //down: zoom out
 	if(radius<minRadius) radius=minRadius;
@@ -46,7 +49,7 @@ void mouseMotion(GLFWwindow *window, double xpos, double ypos)
 	int x=(int)xpos, y=(int)ypos;
 	int dx=prevX-x,dy=y-prevY;
 
-	if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS)
+	if(!guiCapturesMouse && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS)
 	{
 		theta+=dx/250.0f;
 		zenith+=dy/250.0f;
