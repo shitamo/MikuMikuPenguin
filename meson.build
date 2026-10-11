@@ -1,5 +1,5 @@
 project('mikumikupenguin', 'cpp',
-  version : '0.2.1+GLFW3.1',
+  version : '0.2.1+GLFW3.2',
   license : 'GPL-3.0-only',
   meson_version : '>= 0.60.0',
   default_options : [

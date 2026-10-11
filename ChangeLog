@@ -1,3 +1,9 @@
+October 11, 2026 (texture wrap):
+-Model textures repeat (Direct3D's default WRAP sampler) instead of
+ clamping: models with UVs outside [0,1] (e.g. converted from VRM, such as
+ 蒼姫ラピス) showed the wrong colours. Toon and sphere lookups stay inside
+ the image; shared toons still clamp
+
 October 11, 2026: removed the unused logger that left an empty log.txt in the current directory
 
 October 11, 2026: version 0.2.1+GLFW3 (pmx --version, libmmp.pc, Debian)

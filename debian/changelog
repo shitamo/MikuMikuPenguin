@@ -1,3 +1,10 @@
+mikumikupenguin (0.2.1+GLFW3.2) unstable; urgency=medium
+
+  * Repeat model textures like MMD (fixes wrong colours of models whose
+    UVs lie outside 0..1, e.g. converted from VRM).
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 22:40:00 +0900
+
 mikumikupenguin (0.2.1+GLFW3.1) unstable; urgency=medium
 
   * Remove the unused logger (pmxvLogger), which only created an empty

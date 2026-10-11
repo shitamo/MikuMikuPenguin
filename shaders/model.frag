@@ -42,6 +42,14 @@ uniform vec4 sphereAdd;
 uniform vec4 toonMul;
 uniform vec4 toonAdd;
 
+//Toon and sphere textures may come from the model's (repeating) textures:
+//keep their lookups inside the image so the opposite edge does not bleed in
+vec4 sampleClamped(sampler2D s, vec2 uv)
+{
+	vec2 half_ = 0.5 / vec2(textureSize(s, 0));
+	return texture(s, clamp(uv, half_, 1.0 - half_));
+}
+
 in vec2 UV;
 in vec3 normal;
 in vec3 viewPos;
@@ -102,7 +110,7 @@ void main()
 	if(sphereMode == 1 || sphereMode == 2)
 	{
 		vec2 sphereUV = vec2(N.x * 0.5 + 0.5, 1.0 - (N.y * 0.5 + 0.5));
-		vec3 sph = clamp(texture(sphereSampler, sphereUV) * sphereMul + sphereAdd, 0.0, 1.0).rgb;
+		vec3 sph = clamp(sampleClamped(sphereSampler, sphereUV) * sphereMul + sphereAdd, 0.0, 1.0).rgb;
 		if(sphereMode == 1) c *= sph;
 		else                c += sph;
 	}
@@ -114,7 +122,7 @@ void main()
 		if(useToon)
 		{
 			comp = min(clamp(dot(N, L) * 3.0, 0.0, 1.0), comp);
-			shadowC *= clamp(texture(toonSampler, vec2(0.5, 1.0)) * toonMul + toonAdd, 0.0, 1.0).rgb;
+			shadowC *= clamp(sampleClamped(toonSampler, vec2(0.5, 1.0)) * toonMul + toonAdd, 0.0, 1.0).rgb;
 		}
 		vec3 litC = c;
 		if(shininess > 0.0)
@@ -130,7 +138,7 @@ void main()
 	if(useToon)
 	{
 		float ln = clamp(dot(N, L) + 0.5, 0.0, 1.0);
-		c *= clamp(texture(toonSampler, vec2(0.5, 1.0 - ln)) * toonMul + toonAdd, 0.0, 1.0).rgb;
+		c *= clamp(sampleClamped(toonSampler, vec2(0.5, 1.0 - ln)) * toonMul + toonAdd, 0.0, 1.0).rgb;
 	}
 	
 	//specular (Blinn-Phong, like MMD)

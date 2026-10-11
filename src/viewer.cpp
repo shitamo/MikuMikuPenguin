@@ -1150,7 +1150,7 @@ static string resolvePathCaseInsensitive(const string &path)
 
 //Load one image file into a new GL texture.  Falls back to a 1x1 white
 //texture when the file is missing or cannot be decoded.
-static GLuint loadTextureFile(const string &requestedPath, bool rgba, bool verbose=true)
+static GLuint loadTextureFile(const string &requestedPath, bool rgba, bool verbose=true, bool repeat=true)
 {
 	string loc=resolvePathCaseInsensitive(requestedPath);
 	if(verbose) cout<<"Loading "<<loc<<"...";
@@ -1180,8 +1180,11 @@ static GLuint loadTextureFile(const string &requestedPath, bool rgba, bool verbo
 	}
 	if(image) stbi_image_free(image);
 	
-	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+	//Model textures repeat like Direct3D's default (WRAP) sampler: many models
+	//(e.g. converted from VRM) use UVs outside [0,1].  Shared toons clamp.
+	GLint wrap = repeat ? GL_REPEAT : GL_CLAMP_TO_EDGE;
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap );
 	//mipmaps: large (e.g. 4096x4096) textures shimmer badly without them
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
@@ -1220,7 +1223,7 @@ void Viewer::loadSharedTextures()
 		{
 			loc=string(DATA_PATH)+"/textures/"+name;
 		}
-		sharedToon[i-1]=loadTextureFile(loc, true, false);
+		sharedToon[i-1]=loadTextureFile(loc, true, false, false);
 	}
 }
 
