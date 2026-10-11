@@ -38,8 +38,9 @@ Depends: libgl-dev,
          libbullet-dev,
          ${misc:Depends}
 Description: MikuMikuPenguin library (static) and headers
- MikuMikuPenguin (libmmp) loads MikuMikuDance PMX 2.0 / PMD models and VMD motions,
- evaluates bone animation and IK, and simulates rigid bodies with Bullet.
+ MikuMikuPenguin (libmmp) loads MikuMikuDance PMX 2.0 / PMD models and VMD
+ motions, evaluates bone animation and IK, and simulates rigid bodies with
+ Bullet.
  .
  This package contains the static library and the C++ headers
  (installed under /usr/include/libmmp).  The API is not stable.
