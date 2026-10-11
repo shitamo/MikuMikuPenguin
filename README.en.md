@@ -27,32 +27,20 @@ Requirements: GLFW 3, libepoxy, GLM, Bullet, stb_image (SDL3_mixer or SDL2_mixer
 The contents are listed below:
 
 * COPYING: This license for MikuMikuPenguin is included in here.
-* doc: This is a folder for putting various documentation into, but there's nothing in here in particular at this point in time.
+* doc: The manual of the original version (HTML).
 * include: LibMikuMikuPenguin's header (.h) files are in this folder.
-* INSTALL: Details on the installation of LibMikuMikuPenguin are available in this file (English only)
 * libmmp: LibMikuMikuPenguin's source (.cpp) files are in this folder.
 * shaders: PMXViewer's shaders are in this folder.
 * src: PMXViewer's source code (.cpp, .h) are in this folder.
 * data: Required textures and other data files are in this folder.
 
 ## Requirements
-For LibMikuMikuPenguin, libglfw, libglew, libglm, and libBullet are needed.
+For LibMikuMikuPenguin, GLFW 3, libepoxy, GLM, Bullet and iconv are needed.
 
-For PMXViewer (PMX and PMD models), libmmp and stb_image (libstb) are needed (replaced SOIL in the 2026 update). If you want to play music along with the VMD motion, you'll need SDL2 and SDL2_mixer. (You can compile the code without music playback support)
+For PMXViewer (PMX and PMD models), libmmp and stb_image (libstb) are needed. The following are optional; the code compiles without them:
 
-### Details about libraries (1/20/2014):
-* libglfw: At the time of writing 2.7 is needed. Versions 3.0+ are not supported.
-* libglm: At the time of writing 0.9.4 (0.9.2 and 0.9.3 may also be acceptable) is needed. Versions 0.9.5+ are not supported.
-
-**WARNING!!!!!**
-
-In GLM 0.9.3（perhaps also <=0.9.2）there's a bug:
-https://github.com/g-truc/glm/issues/15
-
-To avoid this bug, you must use the -fpermissive flag.
-So like this:
-
-    $ CXXFLAGS="-fpermissive" meson setup build
+* music playback: SDL3_mixer (or SDL2_mixer)
+* on-screen controls (GUI): Dear ImGui (libimgui-dev), and fontconfig to find a Japanese font
 
 ## Installation
 The build uses Meson and Ninja (replaced autotools in the 2026 update):
@@ -65,12 +53,8 @@ To install libmmp and PMXViewer on your system, run:
 
     $ sudo meson install -C build
 
-Use `meson setup build -Dsound=disabled` to build without music playback.
+Use `meson setup build -Dsound=disabled -Dgui=disabled` to build without music playback or on-screen controls.
 A Debian package can be built with `dpkg-buildpackage -us -uc -b`.
-
-## Troubleshooting
-* On OSX, there's currently an issue with software rendering occurring when using too many transformation matrices in the vertex shader. You can reduce the number in shaders/model.vert, but if you don't have enough the model view may break. (We're working on a more permanent solution to this)
-* If you are using the legacy-210 branch, I cannot guarantee anything as far as performance goes.
 
 (There may be an alternative to 'sudo' you need to use depending on your distro to run a process with admin privileges.)
 

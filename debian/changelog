@@ -1,3 +1,10 @@
+mikumikupenguin (0.2.1+20261011.13) unstable; urgency=medium
+
+  * README: drop notes about old library versions and the obsolete branch
+    instructions; update the dependency list.
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 21:50:00 +0900
+
 mikumikupenguin (0.2.1+20261011.12) unstable; urgency=medium
 
   * Open models, motions, camera/light motion and music from the GUI or

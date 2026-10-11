@@ -37,9 +37,8 @@ https://github.com/sn0w75/MikuMikuPenguin/
 中身はこんな感じです：
 
 * COPYING: このコードのライセンス
-* doc: ドキュメンテーションを入れる為のフォルダですが、現時点では得に何も入ってません。
+* doc: 旧版の説明書（HTML）が入ってます。
 * include: LibMikuMikuPenguinのヘッダ（.h）ファイルがここに入ってます。
-* INSTALL: このコードのインストール仕方（英語のみ）
 * libmmp: LibMikuMikuPenguinのソース（.cpp）ファイルがここに入ってます。
 * shaders: PMXViewerのシェーダーがここに入ってます。
 * src: PMXViewerのソースコード（.cpp、.h）がここに入ってます。
@@ -47,25 +46,12 @@ https://github.com/sn0w75/MikuMikuPenguin/
 
 ## 依存ライブラリ
 
-LibMikuMikuPenguinにはlibglfw, libglew,libglm,libBulletが必要です。
+LibMikuMikuPenguinには GLFW 3、libepoxy、GLM、Bullet、iconv が必要です。
 
-PMXViewer（PMX/PMDモデル対応）にはlibmmp、stb_image（libstb）が必要です（2026年版で SOIL から変更）。VMDと一緒に音楽を再生したい場合は、SDL2、SDL2_mixerも必要です。（なくてもコンパイル出来ます）
+PMXViewer（PMX/PMDモデル対応）には libmmp と stb_image（libstb）が必要です。次のものは任意で、なくてもコンパイル出来ます。
 
-### ライブラリの詳細（2014年1月20日）：
-
-* libglfw: 現在では2.7が必要です。3.0+は2.xと非対応です。
-* libglm: 現在では0.9.4(0.9.2、 0.9.3でも大丈夫かもしれません）が必要です。0.9.5+は0.9.4と非対応です。
-
-**注意！！！！！**
-
-GLM 0.9.3（<=0.9.2もそうかもしれない）ではバグがあります： 
-https://github.com/g-truc/glm/issues/15
-
-このバグを回避する為には、-fpermissiveを使う必要があります。例えば：
-
-    $ CXXFLAGS="-fpermissive" meson setup build
-
-みたいな感じです。
+* 音楽再生: SDL3_mixer（無ければ SDL2_mixer）
+* 操作パネル（GUI）: Dear ImGui（libimgui-dev）、日本語フォントの検索に fontconfig
 
 ## インストール
 ビルドには Meson と Ninja を使います（2026年版で autotools から変更）。
@@ -78,60 +64,8 @@ https://github.com/g-truc/glm/issues/15
 
     $ sudo meson install -C build
 
-音楽再生を無効にするには `meson setup build -Dsound=disabled` とします。
+音楽再生や操作パネルを無効にするには `meson setup build -Dsound=disabled -Dgui=disabled` とします。
 Debian パッケージは `dpkg-buildpackage -us -uc -b` で作れます。
-
-***注意！！！***
-現在WindowsでビルドするにはMinGWを使う必要があります。詳細についてはsn0w75氏を連絡。
-（TODO: Windowsでの説示を書く）
-
-## あなたはどのブランチを使うべきか?
-
-今のところ、 あなたのコンピュータが、どのバージョンのOpenGLを使える
-かによって、コンパイルするべき git branch は異なります。
-
-### 確認方法
-
-#### Linux
-
-Linux での確認方法は、コマンドラインで、
-
-     glxinfo | grep OpenGL
-
-を実行して、
-
-     OpenGL vendor string: Tungsten Graphics, Inc
-     OpenGL renderer string: Mesa DRI Intel(R) Ironlake Mobile x86/MMX/SSE2
-     OpenGL version string: 2.1 Mesa 8.0.5
-     OpenGL shading language version string: 1.20
-     OpenGL extensions:
-
-とでてきたら、version strings に注目します。
-
-例示はあなたのコンピュータの OpenGL は Version 2.1
-だと示しています。
-
-### ブランチの切り替え方法
-
-git を使ったことがないなら、<http://progit-ja.github.io/> などで
-学ぶのがいいでしょう。
-
-git clone した直後には
-
-    git checkout -b legacy-210 origin/legacy-210
-
-を実行し、ローカルにブランチを作ります。確認方法は
-
-    git branch -a
-
-です。2回目以降は、git checkout を上記のサイトや書籍などで
-学んでください。
-遅かれ早かれ、ブランチの更新も勉強することになるでしょうから。
-
-## 実行出来ない、パフォーマンスが悪かった場合：
-* OSXでは、頂点シェ－ダーでボーン行列の数が多すぎるとソフト側で頂点シェーディングを行ってしまう場合があります。こういう場合、[shaders/model.vert](https://github.com/sn0w75/MikuMikuPenguin/blob/master/shaders/model.vert#L17)でBones（行列の配列）の行列の数を減らすことで回避出来ますが、少なすぎるとボーン変形でモデルが破損する場合があります。ご注意ください。
-* legacy-210ブランチを使えばOpenGL 2.1しか対応していない環境でもPMXViewerを使えるようになりますが、現代だとそんなような環境はバーチャル環境ぐらいです。OpenGL 2.1やバーチャル環境でのパフォーマンスについては何も保証出来ませんのでご了承ください。
-
 
 他に質問がありました、気軽にメッセージ飛ばしてください。喜んで手伝います：
 * Twitter [@sn0w75](http://twitter.com/sn0w75)
