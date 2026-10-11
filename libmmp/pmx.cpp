@@ -1,4 +1,5 @@
 #include "pmx.h"
+#include <stdexcept>
 #include "glm_helper.h"
 
 #include <fstream>
@@ -193,8 +194,8 @@ namespace ClosedMMDFormat
 		//ifstream miku("apimiku/Appearance Miku.pmx", ios::in | ios::binary);
 		ifstream miku(fname.c_str(), ios::in | ios::binary);
 		if (!miku) {
-			cerr<<"ERROR: PMX file could not be found: "<<fname<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"ERROR: PMX file could not be found: "<<fname; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 		}
 		
 		//***Extract header info***
@@ -215,8 +216,8 @@ namespace ClosedMMDFormat
 			//exit(EXIT_FAILURE);
 		}*/
 		if (pmxInfo.ver != 2.0) {
-			cerr<<"Error: Only version 2.0 of the PMX file format is supported!"<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"Error: Only version 2.0 of the PMX file format is supported!"; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 		}
 		cout<<"PMX Ver. "<<pmxInfo.ver<<endl;
 		
@@ -325,8 +326,8 @@ namespace ClosedMMDFormat
 				//cerr<<"(The program is being forcibly closed because lack of SDEF support is suspected to cause issues in basic model loading and animation"<<endl;
 				//exit(EXIT_FAILURE);
 			} else {
-				cerr<<"ERROR: bone structure (QDEF?) not supported yet"<<endl;
-				exit(EXIT_FAILURE);
+				{ std::ostringstream es_; es_<<"ERROR: bone structure (QDEF?) not supported yet"; cerr<<es_.str()<<endl;
+				throw std::runtime_error(es_.str()); }
 			}
 		
 			miku.read((char*)&vertex->edgeScale, 4);
@@ -355,8 +356,8 @@ namespace ClosedMMDFormat
 		miku.read((char*)&pmxInfo.texture_continuing_datasets, 4);
 		if(!miku || pmxInfo.texture_continuing_datasets<0 || pmxInfo.texture_continuing_datasets>1000000)
 		{
-			cerr<<"ERROR: corrupt PMX file (texture count)"<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"ERROR: corrupt PMX file (texture count)"; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 		}
 		pmxInfo.texturePaths = new string[pmxInfo.texture_continuing_datasets + 11];
 		
@@ -775,8 +776,8 @@ namespace ClosedMMDFormat
 					
 					default:
 					{
-						cerr<<"Unknown morph type or faulty data/reading"<<endl;
-						exit(EXIT_FAILURE);
+						{ std::ostringstream es_; es_<<"Unknown morph type or faulty data/reading"; cerr<<es_.str()<<endl;
+						throw std::runtime_error(es_.str()); }
 					}
 				}
 				
@@ -926,8 +927,8 @@ namespace ClosedMMDFormat
 				miku.read((char*)&joint->springRotationConstant.y, 4);
 				miku.read((char*)&joint->springRotationConstant.z, 4);
 			} else {
-				cerr<<"Unsupported PMX format version or file reading error"<<endl;
-				exit(EXIT_FAILURE);
+				{ std::ostringstream es_; es_<<"Unsupported PMX format version or file reading error"; cerr<<es_.str()<<endl;
+				throw std::runtime_error(es_.str()); }
 			}
 			
 			pmxInfo.joints.push_back(joint);

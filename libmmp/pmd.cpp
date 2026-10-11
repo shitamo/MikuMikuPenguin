@@ -18,6 +18,8 @@
 //in the PMX loader.
 
 #include "pmx.h"
+#include <stdexcept>
+#include <sstream>
 #include "glm_helper.h"
 #include "texthandle.h"
 
@@ -98,8 +100,8 @@ namespace ClosedMMDFormat
 
 		bool fail(const string &fname, const char *what)
 		{
-			cerr<<"ERROR: corrupt or truncated PMD file ("<<what<<"): "<<fname<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"ERROR: corrupt or truncated PMD file ("<<what<<"): "<<fname; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 			return false;
 		}
 
@@ -153,8 +155,8 @@ namespace ClosedMMDFormat
 		ifstream file(fname.c_str(), ios::in | ios::binary);
 		if(!file)
 		{
-			cerr<<"ERROR: PMD file could not be found: "<<fname<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"ERROR: PMD file could not be found: "<<fname; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 		}
 		vector<char> data((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
 		file.close();
@@ -168,8 +170,8 @@ namespace ClosedMMDFormat
 		r.raw(magic, 3);
 		if(!r.ok() || memcmp(magic, "Pmd", 3)!=0)
 		{
-			cerr<<"ERROR: not a PMD file: "<<fname<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"ERROR: not a PMD file: "<<fname; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 		}
 		memcpy(info.header_str, "Pmd", 4);
 		info.ver=r.f32();

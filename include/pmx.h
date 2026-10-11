@@ -74,6 +74,7 @@ namespace ClosedMMDFormat
 	//PMX related Functions
 	void getPMXText(std::ifstream &miku, PMXInfo &pmxInfo, std::string &result, bool debug=false);
 	//! Load a PMX model (a PMD file is detected by its header and loaded with readPMD()).
+	//! Throws std::runtime_error when the file cannot be read.
 	PMXInfo &readPMX(std::string foldername,std::string filename);
 	//! Load a PMD model, converted to the PMX structures (bones, IK, morphs, rigid bodies, joints).
 	PMXInfo &readPMD(std::string foldername,std::string filename);

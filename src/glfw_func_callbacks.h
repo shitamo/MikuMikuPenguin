@@ -19,6 +19,8 @@ extern int prevWheel;
 
 //set every frame by the GUI: the mouse is over / dragging a GUI widget
 extern bool guiCapturesMouse;
+//set every frame by the GUI: a text field or dialog takes the keyboard
+extern bool guiCapturesKeyboard;
 
 extern float zoomStep;
 extern float minRadius;

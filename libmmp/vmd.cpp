@@ -1,4 +1,5 @@
 #include "vmd.h"
+#include <stdexcept>
 
 #include <fstream>
 #include <iostream>
@@ -22,7 +23,7 @@ namespace ClosedMMDFormat
 		VMDInfo &vmdInfo = *vInfo;
 		
 		ifstream miku(filename.c_str(), ios::in | ios::binary);
-		if (!miku) { cerr<<"ERROR: VMD file could not be found: "<<filename<<endl; exit(EXIT_FAILURE); }
+		if (!miku) { { std::ostringstream es_; es_<<"ERROR: VMD file could not be found: "<<filename; cerr<<es_.str()<<endl; throw std::runtime_error(es_.str()); } }
 		
 		//***Extract Header Info***
 		char headerStr[30] = {0};
@@ -41,8 +42,8 @@ namespace ClosedMMDFormat
 		if(!miku) boneCount=0; //older/truncated VMD files may end early
 		if(boneCount>10000000)
 		{
-			cerr<<"ERROR: corrupt VMD file (boneCount="<<boneCount<<")"<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (boneCount="<<boneCount<<")"; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 		}
 		vmdInfo.boneFrames.resize(boneCount);
 		
@@ -129,8 +130,8 @@ namespace ClosedMMDFormat
 		if(!miku) morphCount=0; //older/truncated VMD files may end early
 		if(morphCount>10000000)
 		{
-			cerr<<"ERROR: corrupt VMD file (morphCount="<<morphCount<<")"<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (morphCount="<<morphCount<<")"; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 		}
 		vmdInfo.morphFrames.resize(morphCount);
 		
@@ -162,8 +163,8 @@ namespace ClosedMMDFormat
 		if(!miku) cameraCount=0; //older/truncated VMD files may end early
 		if(cameraCount>10000000)
 		{
-			cerr<<"ERROR: corrupt VMD file (cameraCount="<<cameraCount<<")"<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (cameraCount="<<cameraCount<<")"; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 		}
 		vmdInfo.cameraFrames.resize(cameraCount);
 		//cout<<"Camera Count: "<<vmdInfo.cameraCount<<endl;
@@ -205,8 +206,8 @@ namespace ClosedMMDFormat
 		if(!miku) lightCount=0; //older/truncated VMD files may end early
 		if(lightCount>10000000)
 		{
-			cerr<<"ERROR: corrupt VMD file (lightCount="<<lightCount<<")"<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (lightCount="<<lightCount<<")"; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 		}
 		vmdInfo.lightFrames.resize(lightCount);
 		//cout<<"Light Count: "<<lightCount<<endl;
@@ -235,8 +236,8 @@ namespace ClosedMMDFormat
 		if(!miku) selfShadowCount=0; //older/truncated VMD files may end early
 		if(selfShadowCount>10000000)
 		{
-			cerr<<"ERROR: corrupt VMD file (selfShadowCount="<<selfShadowCount<<")"<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (selfShadowCount="<<selfShadowCount<<")"; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 		}
 		vmdInfo.selfShadowFrames.resize(selfShadowCount);
 		//cout<<"SelfShadow Count: "<<selfShadowCount<<endl;
@@ -261,8 +262,8 @@ namespace ClosedMMDFormat
 		if(!miku) showIKCount=0; //older/truncated VMD files may end early
 		if(showIKCount>10000000)
 		{
-			cerr<<"ERROR: corrupt VMD file (showIKCount="<<showIKCount<<")"<<endl;
-			exit(EXIT_FAILURE);
+			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (showIKCount="<<showIKCount<<")"; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str()); }
 		}
 		vmdInfo.showIKFrames.resize(showIKCount);
 		//cout<<"ShowIK Count: "<<showIKCount<<endl;
@@ -301,7 +302,7 @@ namespace ClosedMMDFormat
 	void writeVMD(VMDInfo &vmdInfo, string filename)
 	{
 		ofstream miku(filename.c_str(), ios::out | ios::binary);
-		if (!miku) { cerr<<"ERROR: VMD file could not be found: "<<filename<<endl; exit(EXIT_FAILURE); }
+		if (!miku) { { std::ostringstream es_; es_<<"ERROR: cannot write VMD file: "<<filename; cerr<<es_.str()<<endl; throw std::runtime_error(es_.str()); } }
 		
 		static const char headerStr[30]="Vocaloid Motion Data 0002\0\0\0\0"; //The last '\0' is implied
 		string modelName=UTF8ToSJIS(vmdInfo.modelName.c_str()); //TODO: Convert UTF8 string back to SHIFT_JIS!!!

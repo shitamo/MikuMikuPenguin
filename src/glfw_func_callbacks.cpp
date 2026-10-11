@@ -22,6 +22,7 @@ int prevWheel=0;
 
 
 bool guiCapturesMouse=false;
+bool guiCapturesKeyboard=false;
 
 float zoomStep=1.0f;   //mouse wheel step (set from the model size)
 float minRadius=1.0f;

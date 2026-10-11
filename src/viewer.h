@@ -46,6 +46,14 @@ struct ModelSpec
 	ModelSpec(const std::string &m="", const std::string &v=""): modelPath(m), motionPath(v), offset(0.0f) {}
 };
 
+//! A file load requested by the GUI or drag and drop (run between frames)
+struct PendingLoad
+{
+	enum Kind { Auto, Model, Motion, Camera, Light, Music, Remove } kind;
+	std::string path;
+	int model; //!< target model (Motion, Remove; Auto: -1 = choose)
+};
+
 //! One model of the scene with its own motion, physics world and GL buffers
 struct SceneModel
 {
@@ -103,6 +111,24 @@ class Viewer
 	
 	//***Models
 	std::vector<SceneModel*> models;
+	int sceneTime; //!< master clock in 1/60 s steps (models are kept in step)
+	SceneModel *readSceneModel(const ModelSpec &spec); //!< throws on a broken file
+	void setupSceneModel(SceneModel &m);
+	void destroySceneModel(SceneModel *m);
+	void rebuildSceneTracks(); //!< camera/light/self shadow keys and end time
+	
+	//***Loading files at run time (errors go to loadError)
+	ClosedMMDFormat::VMDInfo *cameraFileInfo, *lightFileInfo;
+	std::string loadError;
+	std::vector<PendingLoad> pendingLoads;
+	bool addModel(const ModelSpec &spec);
+	void removeModel(size_t index);
+	bool setModelMotion(size_t index, const std::string &motionPath);
+	bool setCameraFile(const std::string &path);
+	bool setLightFile(const std::string &path);
+	bool setMusicFile(const std::string &path);
+	void openFileAuto(const std::string &path, int targetModel=-1);
+	void processPendingLoads();
 	int currentTime() const; //!< playback time in 1/60 s steps (all models are kept in step)
 	glm::mat4 modelMatrixFor(const SceneModel &m) const;
 	bool modelShown(const SceneModel &m) const;

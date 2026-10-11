@@ -13,6 +13,7 @@
 namespace ClosedMMDFormat
 {
 	struct VMDInfo;
+	//! Load a VMD file; throws std::runtime_error when it cannot be read.
 	VMDInfo &readVMD(std::string filename);
 	void writeVMD(VMDInfo &vmdInfo, std::string filename);
 

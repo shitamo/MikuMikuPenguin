@@ -30,6 +30,14 @@ using namespace std;
 #include <fontconfig/fontconfig.h>
 #endif
 
+#include <algorithm>
+#include <vector>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <strings.h>
+#include <climits>
+
 namespace
 {
 	bool japanese=false; //Japanese labels (LANG=ja* and a font with Japanese glyphs)
@@ -103,6 +111,99 @@ namespace
 		return slash==string::npos ? path : path.substr(slash+1);
 	}
 
+	//***Simple file browser (Dear ImGui has none)
+	struct FileBrowser
+	{
+		bool open=false;
+		bool requestOpen=false;
+		PendingLoad::Kind kind=PendingLoad::Model;
+		int model=-1;
+		string title;
+		vector<string> exts;  //lower case, without dot
+		bool showAll=false;
+		string dir;
+		string selected;
+		struct Entry { string name; bool isDir; };
+		vector<Entry> entries;
+		bool dirty=true;
+		char pathBuf[PATH_MAX]={0};
+	};
+	FileBrowser fb;
+	string lastDir; //where the previous file was chosen
+	
+	string currentDir()
+	{
+		char buf[PATH_MAX];
+		if(getcwd(buf, sizeof(buf))) return buf;
+		return "/";
+	}
+	
+	string parentDir(const string &dir)
+	{
+		if(dir.size()<=1) return "/";
+		size_t slash=dir.find_last_of('/', dir.size()-2);
+		if(slash==string::npos || slash==0) return "/";
+		return dir.substr(0, slash);
+	}
+	
+	string joinPath(const string &dir, const string &name)
+	{
+		return (dir.empty() || dir.back()=='/') ? dir+name : dir+"/"+name;
+	}
+	
+	bool isDirectory(const string &path)
+	{
+		struct stat st;
+		return stat(path.c_str(), &st)==0 && S_ISDIR(st.st_mode);
+	}
+	
+	bool hasExt(const string &name, const vector<string> &exts)
+	{
+		size_t dot=name.rfind('.');
+		if(dot==string::npos) return false;
+		string e=name.substr(dot+1);
+		for(char &c : e) c=tolower((unsigned char)c);
+		return std::find(exts.begin(), exts.end(), e)!=exts.end();
+	}
+	
+	void scanDir(FileBrowser &b)
+	{
+		b.entries.clear();
+		b.dirty=false;
+		DIR *d=opendir(b.dir.c_str());
+		if(!d) return;
+		while(dirent *e=readdir(d))
+		{
+			string name=e->d_name;
+			if(name=="." || name==".." || name[0]=='.') continue;
+			bool dirEntry=isDirectory(joinPath(b.dir, name));
+			if(!dirEntry && !b.showAll && !hasExt(name, b.exts)) continue;
+			b.entries.push_back(FileBrowser::Entry{name, dirEntry});
+		}
+		closedir(d);
+		std::sort(b.entries.begin(), b.entries.end(), [](const FileBrowser::Entry &x, const FileBrowser::Entry &y)
+		{
+			if(x.isDir!=y.isDir) return x.isDir;
+			return strcasecmp(x.name.c_str(), y.name.c_str())<0;
+		});
+	}
+	
+	void openBrowser(PendingLoad::Kind kind, int model, const char *title, const vector<string> &exts)
+	{
+		fb.requestOpen=true;
+		fb.kind=kind;
+		fb.model=model;
+		fb.title=title;
+		fb.exts=exts;
+		fb.selected.clear();
+		if(fb.dir.empty()) fb.dir=lastDir.empty() ? currentDir() : lastDir;
+		fb.dirty=true;
+	}
+	
+	const vector<string> modelExts={"pmx", "pmd"};
+	const vector<string> vmdExts={"vmd"};
+	const vector<string> musicExts={"wav", "ogg", "mp3", "flac", "opus", "mid", "midi", "mod", "xm", "it", "s3m", "aif", "aiff", "voc", "wv"};
+	
 	string timeText(int frame)
 	{
 		char buf[32];
@@ -138,7 +239,7 @@ void Viewer::initGUI()
 		static ImVector<ImWchar> ranges;
 		ImFontGlyphRangesBuilder builder;
 		builder.AddRanges(io.Fonts->GetGlyphRangesJapanese());
-		static const ImWchar extra[]={0x2190, 0x21FF, 0x25A0, 0x25FF, 0};
+		static const ImWchar extra[]={0x2000, 0x206F, 0x2190, 0x21FF, 0x25A0, 0x25FF, 0}; //punctuation (…), arrows, shapes
 		builder.AddRanges(extra);
 		builder.BuildRanges(&ranges);
 		ImFont *font=io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 17.0f*scale, &cfg, ranges.Data);
@@ -208,10 +309,12 @@ void Viewer::guiFrame()
 			int sliderFrame=frame;
 			char fmt[64];
 			snprintf(fmt, sizeof(fmt), "%%d / %d", endFrame);
+			ImGui::BeginDisabled(endFrame==0);
 			if(ImGui::SliderInt("##timeline", &sliderFrame, 0, endFrame>0 ? endFrame : 1, fmt) && sliderFrame!=frame)
 			{
 				seekTo(sliderFrame*2);
 			}
+			ImGui::EndDisabled();
 			if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", T("Drag to seek", "ドラッグでシーク"));
 
 			auto button=[&](const char *label, const char *tip)->bool
@@ -243,11 +346,45 @@ void Viewer::guiFrame()
 			ImGui::SameLine();
 			ImGui::TextUnformatted((timeText(frame)+" / "+timeText(endFrame)).c_str());
 
-			//right-aligned: settings / hide
+			//right-aligned: file / settings / hide
+			const char *fileLabel=T("File", "ファイル");
 			const char *settingsLabel=T("Settings", "設定");
 			const char *hideLabel=T("Hide (Tab)", "隠す (Tab)");
-			float rightW=ImGui::CalcTextSize(settingsLabel).x+ImGui::CalcTextSize(hideLabel).x+style.FramePadding.x*4.0f+style.ItemSpacing.x;
+			float rightW=ImGui::CalcTextSize(fileLabel).x+ImGui::CalcTextSize(settingsLabel).x+ImGui::CalcTextSize(hideLabel).x+style.FramePadding.x*6.0f+style.ItemSpacing.x*2.0f;
 			ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x-rightW));
+			if(ImGui::Button(fileLabel)) ImGui::OpenPopup("filemenu");
+			if(ImGui::BeginPopup("filemenu"))
+			{
+				if(ImGui::MenuItem(T("Add model (PMX/PMD)...", "モデルを追加 (PMX/PMD)…")))
+					openBrowser(PendingLoad::Model, -1, T("Add model", "モデルを追加"), modelExts);
+				if(ImGui::BeginMenu(T("Motion for", "モーションを読み込む"), !models.empty()))
+				{
+					for(size_t i=0; i<models.size(); ++i)
+					{
+						string label=std::to_string(i+1)+": "+(models[i]->pmxInfo->modelName.empty() ? baseName(models[i]->spec.modelPath) : models[i]->pmxInfo->modelName);
+						if(ImGui::MenuItem(label.c_str()))
+							openBrowser(PendingLoad::Motion, (int)i, T("Motion", "モーション"), vmdExts);
+					}
+					ImGui::EndMenu();
+				}
+				if(ImGui::MenuItem(T("Camera motion (VMD)...", "カメラモーション (VMD)…")))
+					openBrowser(PendingLoad::Camera, -1, T("Camera motion", "カメラモーション"), vmdExts);
+				if(ImGui::MenuItem(T("Light motion (VMD)...", "照明モーション (VMD)…")))
+					openBrowser(PendingLoad::Light, -1, T("Light motion", "照明モーション"), vmdExts);
+				if(ImGui::MenuItem(T("Music...", "音楽…")))
+					openBrowser(PendingLoad::Music, -1, T("Music", "音楽"), musicExts);
+				ImGui::Separator();
+				if(ImGui::MenuItem(T("Remove camera motion", "カメラモーションを外す"), NULL, false, !cameraPathShown.empty()))
+					pendingLoads.push_back(PendingLoad{PendingLoad::Camera, "", -1});
+				if(ImGui::MenuItem(T("Remove light motion", "照明モーションを外す"), NULL, false, !lightPathShown.empty()))
+					pendingLoads.push_back(PendingLoad{PendingLoad::Light, "", -1});
+				if(ImGui::MenuItem(T("Stop music", "音楽を外す"), NULL, false, !musicPathShown.empty()))
+					pendingLoads.push_back(PendingLoad{PendingLoad::Music, "", -1});
+				ImGui::Separator();
+				ImGui::TextDisabled("%s", T("Files can also be dropped onto the window", "ファイルはウィンドウへのドロップでも読み込めます"));
+				ImGui::EndPopup();
+			}
+			ImGui::SameLine();
 			if(ImGui::Button(settingsLabel)) guiShowSettings=!guiShowSettings;
 			ImGui::SameLine();
 			if(ImGui::Button(hideLabel)) guiVisible=false;
@@ -283,6 +420,17 @@ void Viewer::guiFrame()
 						if(!m.pmxInfo->modelName.empty()) { ImGui::SameLine(); ImGui::TextDisabled("(%s)", m.pmxInfo->modelName.c_str()); }
 						ImGui::Indent();
 						fileRow(T("Motion", "モーション"), m.spec.motionPath.empty() ? string(T("(none)", "（なし）")) : m.spec.motionPath, "");
+						if(ImGui::SmallButton(T("Load motion...", "モーション読み込み…")))
+							openBrowser(PendingLoad::Motion, (int)i, T("Motion", "モーション"), vmdExts);
+						if(!m.spec.motionPath.empty())
+						{
+							ImGui::SameLine();
+							if(ImGui::SmallButton(T("Remove motion", "モーションを外す")))
+								pendingLoads.push_back(PendingLoad{PendingLoad::Motion, "", (int)i});
+						}
+						ImGui::SameLine();
+						if(ImGui::SmallButton(T("Remove model", "モデルを削除")))
+							pendingLoads.push_back(PendingLoad{PendingLoad::Remove, "", (int)i});
 						if(models.size()>1 || m.offset!=glm::vec3(0.0f))
 						{
 							//shown in MMD coordinates (Z is mirrored)
@@ -297,6 +445,8 @@ void Viewer::guiFrame()
 						ImGui::Unindent();
 						ImGui::PopID();
 					}
+					if(ImGui::Button(T("Add model...", "モデルを追加…")))
+						openBrowser(PendingLoad::Model, -1, T("Add model", "モデルを追加"), modelExts);
 					fileRow(T("Camera", "カメラ"), cameraPathShown, "");
 					fileRow(T("Light", "照明"), lightPathShown, "");
 					fileRow(T("Music", "音楽"), musicPathShown, "");
@@ -381,8 +531,146 @@ void Viewer::guiFrame()
 		ImGui::End();
 	}
 
+	const ImGuiViewport *vpm=ImGui::GetMainViewport();
+	ImVec2 centre(vpm->WorkPos.x+vpm->WorkSize.x*0.5f, vpm->WorkPos.y+vpm->WorkSize.y*0.5f);
+	
+	//***Nothing loaded yet***
+	if(models.empty() && pendingLoads.empty() && !fb.open)
+	{
+		ImGui::SetNextWindowPos(centre, 0, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowBgAlpha(0.8f);
+		if(ImGui::Begin("##empty", NULL, ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoMove))
+		{
+			ImGui::TextUnformatted(T("Drop PMX/PMD, VMD and music files onto this window,", "PMX/PMD・VMD・音楽ファイルをこのウィンドウにドロップするか、"));
+			ImGui::TextUnformatted(T("or choose them here:", "ここから選んでください。"));
+			if(ImGui::Button(T("Add model...", "モデルを追加…")))
+				openBrowser(PendingLoad::Model, -1, T("Add model", "モデルを追加"), modelExts);
+		}
+		ImGui::End();
+	}
+	
+	//***File browser***
+	if(fb.requestOpen)
+	{
+		ImGui::OpenPopup("###filebrowser");
+		fb.requestOpen=false;
+		fb.open=true;
+	}
+	ImGui::SetNextWindowSize(ImVec2(vpm->WorkSize.x*0.6f, vpm->WorkSize.y*0.7f), ImGuiCond_Appearing);
+	ImGui::SetNextWindowPos(centre, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+	string popupTitle=fb.title+"###filebrowser";
+	if(ImGui::BeginPopupModal(popupTitle.c_str(), NULL, ImGuiWindowFlags_NoSavedSettings))
+	{
+		if(fb.dirty)
+		{
+			scanDir(fb);
+			snprintf(fb.pathBuf, sizeof(fb.pathBuf), "%s", fb.dir.c_str());
+		}
+		string chosen;
+		
+		if(ImGui::Button(T("Up", "上へ"))) { fb.dir=parentDir(fb.dir); fb.dirty=true; }
+		ImGui::SameLine();
+		if(ImGui::Button(T("Home", "ホーム")))
+		{
+			const char *home=getenv("HOME");
+			fb.dir=home ? home : "/";
+			fb.dirty=true;
+		}
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(-1.0f);
+		if(ImGui::InputText("##path", fb.pathBuf, sizeof(fb.pathBuf), ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll))
+		{
+			string p=fb.pathBuf;
+			if(isDirectory(p)) { fb.dir=p; fb.dirty=true; }
+			else chosen=p; //a file typed in directly
+		}
+		
+		float footer=ImGui::GetFrameHeightWithSpacing()*2.0f;
+		if(ImGui::BeginChild("##entries", ImVec2(0.0f, -footer), true))
+		{
+			for(const FileBrowser::Entry &e : fb.entries)
+			{
+				string label=e.isDir ? e.name+"/" : e.name;
+				bool sel=(!e.isDir && e.name==fb.selected);
+				if(ImGui::Selectable(label.c_str(), sel, ImGuiSelectableFlags_AllowDoubleClick))
+				{
+					if(e.isDir)
+					{
+						fb.dir=joinPath(fb.dir, e.name); //folders open with a single click
+						fb.dirty=true;
+						fb.selected.clear();
+					}
+					else
+					{
+						fb.selected=e.name;
+						if(ImGui::IsMouseDoubleClicked(0)) chosen=joinPath(fb.dir, e.name);
+					}
+				}
+			}
+			if(fb.entries.empty()) ImGui::TextDisabled("%s", T("(no matching files)", "（該当するファイルがありません）"));
+		}
+		ImGui::EndChild();
+		
+		if(ImGui::Checkbox(T("Show all files", "すべてのファイルを表示"), &fb.showAll)) fb.dirty=true;
+		ImGui::SameLine();
+		ImGui::TextDisabled("%s", fb.selected.c_str());
+		float buttonsW=ImGui::CalcTextSize(T("Open", "開く")).x+ImGui::CalcTextSize(T("Cancel", "キャンセル")).x+ImGui::GetStyle().FramePadding.x*4.0f+ImGui::GetStyle().ItemSpacing.x;
+		ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x-buttonsW));
+		ImGui::BeginDisabled(fb.selected.empty());
+		if(ImGui::Button(T("Open", "開く"))) chosen=joinPath(fb.dir, fb.selected);
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		bool cancel=ImGui::Button(T("Cancel", "キャンセル")) || ImGui::IsKeyPressed(ImGuiKey_Escape);
+		
+		if(!chosen.empty())
+		{
+			pendingLoads.push_back(PendingLoad{fb.kind, chosen, fb.model});
+			lastDir=fb.dir;
+			cancel=true;
+		}
+		if(cancel)
+		{
+			fb.open=false;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+	else
+	{
+		fb.open=false;
+	}
+	
+	//***Loading / errors***
+	if(!pendingLoads.empty())
+	{
+		ImGui::SetNextWindowPos(centre, 0, ImVec2(0.5f, 0.5f));
+		if(ImGui::Begin("##loading", NULL, ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoInputs))
+		{
+			ImGui::TextUnformatted(T("Loading...", "読み込み中…"));
+			for(const PendingLoad &l : pendingLoads) if(!l.path.empty()) ImGui::TextDisabled("%s", baseName(l.path).c_str());
+		}
+		ImGui::End();
+	}
+	if(!loadError.empty() && !ImGui::IsPopupOpen("###loaderror"))
+	{
+		ImGui::OpenPopup("###loaderror");
+	}
+	ImGui::SetNextWindowPos(centre, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+	if(ImGui::BeginPopupModal(T("Error###loaderror", "エラー###loaderror"), NULL, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoSavedSettings))
+	{
+		ImGui::TextUnformatted(loadError.c_str());
+		if(ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_Escape))
+		{
+			loadError.clear();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+	
 	ImGui::Render();
 	guiCapturesMouse=ImGui::GetIO().WantCaptureMouse;
+	//typing in a text field or a dialog being open: no viewer shortcuts
+	guiCapturesKeyboard=ImGui::GetIO().WantCaptureKeyboard || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);
 }
 
 void Viewer::guiRender()

@@ -20,6 +20,14 @@ given before it (a model without a VMD stays in its rest pose).  All models
 share the time line, the camera and the light; each has its own physics
 (models do not collide with each other).  Motions made for several dancers
 usually contain each dancer's position already.
+.PP
+Files can also be opened while the viewer runs: from \fBFile\fR on the
+playback bar (add a model, a motion for a model, camera or light motion,
+music), from the settings panel (motion / remove for each model), or by
+dropping them onto the window (PMX/PMD = add a model, VMD = motion for the
+first model without one, or camera/light motion when the VMD has no bone or
+morph keys, other files = music).  Without file arguments the viewer starts
+empty.
 .SH OPTIONS
 .TP
 \fB\-\-pos\fR \fIX,Y,Z\fR

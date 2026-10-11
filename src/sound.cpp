@@ -17,40 +17,53 @@ static MIX_Mixer *mixer=NULL;
 static MIX_Audio *music=NULL;
 static MIX_Track *track=NULL;
 
-void initSound(string filename)
+static bool openAudio()
 {
-	if(filename=="") return;
-	
-	cout<<"initializing sound (SDL3_mixer)...";
-	
+	if(mixer) return true;
+	cout<<"initializing sound (SDL3_mixer)..."<<endl;
 	//keep Ctrl-C / SIGTERM working (SDL would otherwise turn them into an
 	//SDL quit event that the viewer never looks at)
 	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 	if(!SDL_Init(SDL_INIT_AUDIO) || !MIX_Init())
 	{
 		cerr<<"Error initializing SDL3_mixer: "<<SDL_GetError()<<endl<<"Continuing without sound."<<endl;
-		return;
+		return false;
 	}
 	mixer=MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
 	if(!mixer)
 	{
 		cerr<<"Error opening audio device: "<<SDL_GetError()<<endl<<"Continuing without sound."<<endl;
-		return;
+		return false;
 	}
+	return true;
+}
+
+bool soundLoad(const string &filename)
+{
+	if(track) MIX_StopTrack(track, 0);
+	if(music) { MIX_DestroyAudio(music); music=NULL; }
+	if(filename.empty()) return true;
+	if(!openAudio()) return false;
+	
 	music=MIX_LoadAudio(mixer, filename.c_str(), false);
 	if(!music)
 	{
 		cerr<<"ERROR: failed to load music "<<filename<<": "<<SDL_GetError()<<endl;
-		return;
+		return false;
 	}
-	track=MIX_CreateTrack(mixer);
+	if(!track) track=MIX_CreateTrack(mixer);
 	if(!track || !MIX_SetTrackAudio(track, music) || !MIX_PlayTrack(track, 0))
 	{
 		cerr<<"ERROR: failed to play music: "<<SDL_GetError()<<endl;
-		return;
+		return false;
 	}
-	
-	cout<<"done"<<endl;
+	cout<<"Playing "<<filename<<endl;
+	return true;
+}
+
+void initSound(string filename)
+{
+	if(filename!="") soundLoad(filename);
 }
 
 void soundSetPaused(bool paused)
@@ -93,28 +106,45 @@ static int wavChannel=-1;
 static int devFreq=44100, devChannels=2;
 static Uint16 devFormat=AUDIO_S16SYS;
 
-void initSound(string filename)
+static bool audioOpen=false;
+
+static bool openAudio()
 {
-	if(filename=="") return;
-	
-	cout<<"initializing sound (SDL2_mixer)...";
-	
+	if(audioOpen) return true;
+	cout<<"initializing sound (SDL2_mixer)..."<<endl;
 	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1"); //keep Ctrl-C / SIGTERM working
 	SDL_Init(SDL_INIT_AUDIO);
-	Mix_Init(MIX_INIT_OGG | MIX_INIT_MP3);
-	
+	Mix_Init(MIX_INIT_OGG | MIX_INIT_MP3 | MIX_INIT_FLAC | MIX_INIT_OPUS);
 	if(Mix_OpenAudio(44100, AUDIO_S16SYS, 2, 4096)==-1)
 	{
 		cerr<<"Error initializing SDL_mixer: "<<Mix_GetError()<<endl<<"Continuing without sound."<<endl;
-		return;
+		return false;
 	}
 	Mix_QuerySpec(&devFreq, &devFormat, &devChannels);
+	audioOpen=true;
+	return true;
+}
+
+bool soundLoad(const string &filename)
+{
+	//stop and free the current music
+	if(audioOpen)
+	{
+		Mix_HaltMusic();
+		if(wavChannel>=0) Mix_HaltChannel(wavChannel);
+	}
+	wavChannel=-1;
+	if(partChunk) { Mix_FreeChunk(partChunk); partChunk=NULL; }
+	if(wavChunk) { Mix_FreeChunk(wavChunk); wavChunk=NULL; }
+	if(music) { Mix_FreeMusic(music); music=NULL; }
+	if(filename.empty()) return true;
+	if(!openAudio()) return false;
 	
 	music = Mix_LoadMUS(filename.c_str());
 	if(music == NULL)
 	{
 		cerr<<"ERROR: failed to load music "<<filename<<": "<<Mix_GetError()<<endl;
-		return;
+		return false;
 	}
 	if(Mix_GetMusicType(music)==MUS_WAV)
 	{
@@ -124,13 +154,18 @@ void initSound(string filename)
 			Mix_FreeMusic(music);
 			music=NULL;
 			wavChannel=Mix_PlayChannel(-1, wavChunk, 0);
-			cout<<"done"<<endl;
-			return;
+			cout<<"Playing "<<filename<<endl;
+			return true;
 		}
 	}
-	
-	cout<<"done"<<endl;
 	Mix_PlayMusic(music, 0);
+	cout<<"Playing "<<filename<<endl;
+	return true;
+}
+
+void initSound(string filename)
+{
+	if(filename!="") soundLoad(filename);
 }
 
 void soundSetPaused(bool paused)

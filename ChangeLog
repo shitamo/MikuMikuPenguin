@@ -1,3 +1,14 @@
+October 11, 2026 (opening files from the GUI):
+-File menu on the playback bar (add model, motion for a model, camera /
+ light motion, music, and removing them), per-model "load motion",
+ "remove motion" and "remove model" in the settings panel, with a built-in
+ file browser; files can also be dropped onto the window (the kind is
+ guessed from the extension and the VMD contents). The viewer can start
+ without files. Load errors are shown in a dialog
+-libmmp: readPMX/readPMD/readVMD throw std::runtime_error instead of
+ calling exit() on broken files
+-Music can be replaced at run time (SDL3_mixer and SDL2_mixer)
+
 October 11, 2026 (deformation order):
 -Inheritance and IK are evaluated bone by bone in MMD's deformation order
  (after-physics flag, level, index) instead of all IK followed by all

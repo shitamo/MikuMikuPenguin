@@ -4,6 +4,7 @@
 #include <sstream>
 #include <cstring>
 #include <cstdio>
+#include <stdexcept>
 #include <vector>
 
 
@@ -30,7 +31,8 @@ static bool hasSuffix(const string &str, const char *suffix)
 void printHelpInfo()
 {
 	cout<<"This is PMXViewer, a demonstration using the MikuMikuPenguin library."<<endl
-	<<"Usage: pmx [options] model.pmx|model.pmd motion.vmd [model2.pmx motion2.vmd ...]"<<endl
+	<<"Usage: pmx [options] [model.pmx|model.pmd [motion.vmd] [model2.pmx motion2.vmd ...]]"<<endl
+	<<"Without files the viewer starts empty: use File in the window or drop files onto it."<<endl
 	<<"Several models can be played together; each VMD belongs to the model before it."<<endl
 	<<"Options: "<<endl
 	<<"  -s\tPlay sound file to go with VMD motion"<<endl
@@ -156,17 +158,12 @@ int main(int argc, char** argv)
 			}
 		}
 	}
-	else
-	{
-		printHelpInfo();
-		return 0;
-	}
+	//without arguments the viewer starts empty; files are opened from the
+	//GUI or dropped onto the window
 	
 	if(models.empty())
 	{
-		cout<<"Did not specify a model file!"<<endl<<endl;
-		printHelpInfo();
-		return 0;
+		cout<<"No model given: open files from the GUI (File) or drop them onto the window."<<endl;
 	}
 	for(const string &m : pendingMotions)
 	{
@@ -177,11 +174,20 @@ int main(int argc, char** argv)
 		if(m.motionPath.empty()) cerr<<"Note: "<<m.modelPath<<" has no motion (shown in its rest pose)"<<endl;
 	}
 	
-	Viewer viewer(models,music_file,camera_file,light_file);
-	
-	viewer.setLoop(loop);
-	viewer.setGUI(gui);
-	viewer.run();
+	try
+	{
+		Viewer viewer(models,music_file,camera_file,light_file);
+		
+		viewer.setLoop(loop);
+		viewer.setGUI(gui);
+		viewer.run();
+	}
+	catch(const std::exception &e)
+	{
+		cerr<<"ERROR: "<<e.what()<<endl;
+		delete pmxvLogger::get();
+		return 1;
+	}
 	
 	delete pmxvLogger::get();	
 	return 0;

@@ -1,3 +1,11 @@
+mikumikupenguin (0.2.1+20261011.12) unstable; urgency=medium
+
+  * Open models, motions, camera/light motion and music from the GUI or
+    by drag and drop; start without files.
+  * libmmp: loaders throw std::runtime_error instead of exiting.
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 21:30:00 +0900
+
 mikumikupenguin (0.2.1+20261011.11) unstable; urgency=medium
 
   * Evaluate inheritance and IK in MMD's deformation order (fixes clothes

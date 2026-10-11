@@ -28,6 +28,8 @@
 #include <algorithm>
 
 static void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
+static void dropCallback(GLFWwindow *window, int count, const char **paths);
+static std::vector<std::string> droppedFiles;
 
 #include "glfw_func_callbacks.h"
 
@@ -62,26 +64,27 @@ Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cam
 	musicPathShown=musicPath;
 	cameraPathShown=cameraPath;
 	lightPathShown=lightPath;
+	cameraFileInfo=NULL;
+	lightFileInfo=NULL;
 	physicsEnabled=true;
 	showModel=true;
 	debugDrawMode=0;
 	guiAvailable=false;
 	guiVisible=true;
 	guiShowSettings=false;
+	sceneTime=0;
+	paused=false;
+	loopPlayback=false;
+	endTime=0;
+	useCameraMotion=false;
+	useLightMotion=false;
 	
-	//***Load the files (before opening the window, so errors appear quickly)
-	for(const ModelSpec &spec : modelSpecs)
-	{
-		SceneModel *m=new SceneModel();
-		m->spec=spec;
-		string folder, file;
-		splitModelPath(spec.modelPath, folder, file);
-		m->pmxInfo=&readPMX(folder, file);
-		m->vmdInfo=spec.motionPath.empty() ? new ClosedMMDFormat::VMDInfo() : &readVMD(spec.motionPath);
-		m->offset=spec.offset;
-		m->visible=true;
-		models.push_back(m);
-	}
+	//***Read the files given on the command line (before opening the window,
+	//so that errors appear quickly; a broken file is fatal here)
+	vector<SceneModel*> loaded;
+	for(const ModelSpec &spec : modelSpecs) loaded.push_back(readSceneModel(spec));
+	if(!cameraPath.empty()) cameraFileInfo=&readVMD(cameraPath);
+	if(!lightPath.empty()) lightFileInfo=&readVMD(lightPath);
 	
 	initGLFW();
 	
@@ -108,35 +111,10 @@ Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cam
 	
 	loadSharedTextures();
 	
-	//***Per model: textures, buffers, motion controller and physics.  Every
-	//model has its own Bullet world (models do not collide with each other).
-	for(SceneModel *mp : models)
+	for(SceneModel *m : loaded)
 	{
-		SceneModel &m=*mp;
-		loadTextures(m);
-		initBuffers(m);
-		
-		glBindBuffer(GL_ARRAY_BUFFER, m.vertexBuffer); //the controller streams vertices into the bound buffer
-		m.motionController=new VMDMotionController(*m.pmxInfo, *m.vmdInfo, shaderProgram);
-		
-		m.bulletPhysics=new BulletPhysics(bulletVertPath, bulletFragPath);
-		glUseProgram(shaderProgram); //restore after BulletPhysics compiled its debug shader
-		m.mmdPhysics=new MMDPhysics(*m.pmxInfo, m.motionController, m.bulletPhysics);
-		
-		m.motionController->updateVertexMorphs();
-		m.motionController->updateBoneAnimation();
-		//Start the physics from the first frame's pose instead of the bind pose
-		m.mmdPhysics->resetToCurrentPose();
-		m.motionController->updateBoneMatrix();
-		
-		//mesh bounding box at rest, used to frame the camera
-		m.restMin=glm::vec3(1e30f); m.restMax=glm::vec3(-1e30f);
-		for(int i=0; i<m.pmxInfo->vertex_continuing_datasets; ++i)
-		{
-			m.restMin=glm::min(m.restMin, m.pmxInfo->vertices[i]->pos);
-			m.restMax=glm::max(m.restMax, m.pmxInfo->vertices[i]->pos);
-		}
-		if(m.pmxInfo->vertex_continuing_datasets==0) { m.restMin=glm::vec3(-10.0f,0.0f,-10.0f); m.restMax=glm::vec3(10.0f,20.0f,10.0f); }
+		setupSceneModel(*m);
+		models.push_back(m);
 	}
 	
 	initSound(musicPath);
@@ -149,42 +127,111 @@ Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cam
 	updateSceneBounds();
 	resetCamera();
 	
-	//Camera, light and self shadow keys: from the -c (camera) / -l (light)
-	//VMD, otherwise from the first motion VMD that has them.  MMD saves
-	//camera and light together, so the camera VMD also provides the light.
-	ClosedMMDFormat::VMDInfo *camInfo=NULL, *lightInfo=NULL;
-	if(!cameraPath.empty())
+	//Shadows (MMD defaults: ground shadow and self shadow on)
+	useGroundShadow=true;
+	useSelfShadow=true;
+	
+	rebuildSceneTracks();
+	if(useCameraMotion) cout<<"Using camera motion (press C to toggle)"<<endl;
+	if(useLightMotion) cout<<"Using light motion (press L to toggle)"<<endl;
+	lastTheta=theta; lastZenith=zenith; lastRadius=radius;
+}
+
+//Read a model and its motion (throws std::exception on a broken file)
+SceneModel *Viewer::readSceneModel(const ModelSpec &spec)
+{
+	SceneModel *m=new SceneModel();
+	m->spec=spec;
+	string folder, file;
+	splitModelPath(spec.modelPath, folder, file);
+	m->pmxInfo=&readPMX(folder, file);
+	m->vmdInfo=spec.motionPath.empty() ? new ClosedMMDFormat::VMDInfo() : &readVMD(spec.motionPath);
+	m->offset=spec.offset;
+	m->visible=true;
+	m->motionController=NULL;
+	m->bulletPhysics=NULL;
+	m->mmdPhysics=NULL;
+	m->vao=m->vertexBuffer=m->indexBuffer=0;
+	return m;
+}
+
+//Textures, buffers, motion controller and physics of a model, posed at the
+//current time.  Every model has its own Bullet world (models do not collide
+//with each other).
+void Viewer::setupSceneModel(SceneModel &m)
+{
+	loadTextures(m);
+	initBuffers(m);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, m.vertexBuffer); //the controller streams vertices into the bound buffer
+	m.motionController=new VMDMotionController(*m.pmxInfo, *m.vmdInfo, shaderProgram);
+	
+	m.bulletPhysics=new BulletPhysics(bulletVertPath, bulletFragPath);
+	glUseProgram(shaderProgram); //restore after BulletPhysics compiled its debug shader
+	m.mmdPhysics=new MMDPhysics(*m.pmxInfo, m.motionController, m.bulletPhysics);
+	
+	m.motionController->setTime(sceneTime);
+	m.motionController->updateVertexMorphs();
+	m.motionController->updateBoneAnimation();
+	//Start the physics from the current pose instead of the bind pose
+	m.mmdPhysics->resetToCurrentPose();
+	m.motionController->updateBoneMatrix();
+	
+	//mesh bounding box at rest, used to frame the camera
+	m.restMin=glm::vec3(1e30f); m.restMax=glm::vec3(-1e30f);
+	for(int i=0; i<m.pmxInfo->vertex_continuing_datasets; ++i)
 	{
-		camInfo=&readVMD(cameraPath);
-		if(camInfo->cameraFrames.empty()) cerr<<"WARNING: "<<cameraPath<<" contains no camera frames"<<endl;
+		m.restMin=glm::min(m.restMin, m.pmxInfo->vertices[i]->pos);
+		m.restMax=glm::max(m.restMax, m.pmxInfo->vertices[i]->pos);
 	}
-	if(!lightPath.empty())
-	{
-		lightInfo=&readVMD(lightPath);
-		if(lightInfo->lightFrames.empty()) cerr<<"WARNING: "<<lightPath<<" contains no light frames"<<endl;
-	}
+	if(m.pmxInfo->vertex_continuing_datasets==0) { m.restMin=glm::vec3(-10.0f,0.0f,-10.0f); m.restMax=glm::vec3(10.0f,20.0f,10.0f); }
+}
+
+void Viewer::destroySceneModel(SceneModel *m)
+{
+	if(!m) return;
+	delete m->mmdPhysics;
+	delete m->bulletPhysics;
+	delete m->motionController;
+	if(!m->textures.empty()) glDeleteTextures((GLsizei)m->textures.size(), m->textures.data());
+	if(m->vertexBuffer) glDeleteBuffers(1, &m->vertexBuffer);
+	if(m->indexBuffer) glDeleteBuffers(1, &m->indexBuffer);
+	if(m->vao) glDeleteVertexArrays(1, &m->vao);
+	//PMXInfo / VMDInfo own raw pointers without destructors; they are leaked
+	//(a few MB per removed model)
+	delete m;
+	glUseProgram(shaderProgram);
+}
+
+//Camera, light and self shadow keys: from the camera (-c) / light (-l) VMD,
+//otherwise from the first motion VMD that has them (MMD saves camera and
+//light together, so the camera VMD also provides the light).  Also the end
+//of the motion.  Called whenever files are added or removed.
+void Viewer::rebuildSceneTracks()
+{
+	bool hadCamera=!cameraController.empty(), hadLight=!lightController.empty();
 	auto firstMotionWith=[&](auto pred)->ClosedMMDFormat::VMDInfo*
 	{
 		for(SceneModel *m : models) if(pred(*m->vmdInfo)) return m->vmdInfo;
 		return NULL;
 	};
 	ClosedMMDFormat::VMDInfo *src;
-	src=camInfo ? camInfo : firstMotionWith([](const ClosedMMDFormat::VMDInfo &v){ return !v.cameraFrames.empty(); });
-	if(src) cameraController=VMDCameraController(src->cameraFrames);
-	src=lightInfo;
-	if(!src && camInfo && !camInfo->lightFrames.empty()) src=camInfo;
+	src=cameraFileInfo ? cameraFileInfo : firstMotionWith([](const ClosedMMDFormat::VMDInfo &v){ return !v.cameraFrames.empty(); });
+	cameraController=src ? VMDCameraController(src->cameraFrames) : VMDCameraController();
+	src=lightFileInfo;
+	if(!src && cameraFileInfo && !cameraFileInfo->lightFrames.empty()) src=cameraFileInfo;
 	if(!src) src=firstMotionWith([](const ClosedMMDFormat::VMDInfo &v){ return !v.lightFrames.empty(); });
-	if(src) lightController=VMDLightController(src->lightFrames);
-	useCameraMotion=!cameraController.empty();
-	if(useCameraMotion) cout<<"Using camera motion (press C to toggle)"<<endl;
-	useLightMotion=!lightController.empty();
-	if(useLightMotion) cout<<"Using light motion (press L to toggle)"<<endl;
+	lightController=src ? VMDLightController(src->lightFrames) : VMDLightController();
 	
-	//Shadows (MMD defaults: ground shadow and self shadow on)
-	useGroundShadow=true;
-	useSelfShadow=true;
+	//turn camera / light motion on when they appear, off when they go away
+	if(cameraController.empty()) useCameraMotion=false;
+	else if(!hadCamera) useCameraMotion=true;
+	if(lightController.empty()) useLightMotion=false;
+	else if(!hadLight) useLightMotion=true;
+	
+	selfShadowKeys.clear();
 	{
-		src=(camInfo && !camInfo->selfShadowFrames.empty()) ? camInfo
+		src=(cameraFileInfo && !cameraFileInfo->selfShadowFrames.empty()) ? cameraFileInfo
 		    : firstMotionWith([](const ClosedMMDFormat::VMDInfo &v){ return !v.selfShadowFrames.empty(); });
 		std::vector<ClosedMMDFormat::VMDSelfShadowFrame> frames;
 		if(src) frames=src->selfShadowFrames;
@@ -193,22 +240,182 @@ Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cam
 		for(const auto &f : frames) selfShadowKeys.push_back(std::make_pair(f.frame, f.type!=0));
 	}
 	
-	//Playback: the motion ends at its last key (any model, camera or light)
-	paused=false;
-	loopPlayback=false;
+	//the motion ends at its last key (any model, camera or light)
+	unsigned last=0;
+	for(SceneModel *m : models) last=std::max(last, m->motionController->lastKeyFrame());
+	last=std::max(last, cameraController.lastFrame());
+	last=std::max(last, lightController.lastFrame());
+	endTime=(int)last*2;
+}
+
+//***Loading files while running (GUI, drag and drop).  Errors are reported
+//in loadError instead of terminating the viewer.
+bool Viewer::addModel(const ModelSpec &spec)
+{
+	SceneModel *m=NULL;
+	try
 	{
-		unsigned last=0;
-		for(SceneModel *m : models) last=std::max(last, m->motionController->lastKeyFrame());
-		last=std::max(last, cameraController.lastFrame());
-		last=std::max(last, lightController.lastFrame());
-		endTime=(int)last*2;
+		m=readSceneModel(spec);
 	}
-	lastTheta=theta; lastZenith=zenith; lastRadius=radius;
+	catch(const std::exception &e)
+	{
+		loadError=e.what();
+		return false;
+	}
+	bool first=models.empty();
+	setupSceneModel(*m);
+	models.push_back(m);
+	updateSceneBounds();
+	if(first) resetCamera();
+	rebuildSceneTracks();
+	return true;
+}
+
+void Viewer::removeModel(size_t index)
+{
+	if(index>=models.size()) return;
+	destroySceneModel(models[index]);
+	models.erase(models.begin()+index);
+	updateSceneBounds();
+	rebuildSceneTracks();
+}
+
+//Give model `index` another motion (the model is reloaded so that its
+//controller and physics start clean); an empty path removes the motion
+bool Viewer::setModelMotion(size_t index, const string &motionPath)
+{
+	if(index>=models.size()) return false;
+	SceneModel *old=models[index];
+	ModelSpec spec=old->spec;
+	spec.motionPath=motionPath;
+	spec.offset=old->offset;
+	SceneModel *m=NULL;
+	try
+	{
+		m=readSceneModel(spec);
+	}
+	catch(const std::exception &e)
+	{
+		loadError=e.what();
+		return false;
+	}
+	m->visible=old->visible;
+	destroySceneModel(old);
+	setupSceneModel(*m);
+	models[index]=m;
+	rebuildSceneTracks();
+	return true;
+}
+
+bool Viewer::setCameraFile(const string &path)
+{
+	ClosedMMDFormat::VMDInfo *info=NULL;
+	if(!path.empty())
+	{
+		try { info=&readVMD(path); }
+		catch(const std::exception &e) { loadError=e.what(); return false; }
+		if(info->cameraFrames.empty()) loadError=string("No camera keys in ")+path;
+	}
+	cameraFileInfo=info;
+	cameraPathShown=path;
+	cameraController=VMDCameraController(); //re-enable camera motion if keys are found
+	rebuildSceneTracks();
+	return true;
+}
+
+bool Viewer::setLightFile(const string &path)
+{
+	ClosedMMDFormat::VMDInfo *info=NULL;
+	if(!path.empty())
+	{
+		try { info=&readVMD(path); }
+		catch(const std::exception &e) { loadError=e.what(); return false; }
+		if(info->lightFrames.empty()) loadError=string("No light keys in ")+path;
+	}
+	lightFileInfo=info;
+	lightPathShown=path;
+	lightController=VMDLightController();
+	rebuildSceneTracks();
+	return true;
+}
+
+bool Viewer::setMusicFile(const string &path)
+{
+	if(!path.empty() && !soundLoad(path))
+	{
+		loadError=string("Cannot play ")+path;
+		return false;
+	}
+	if(path.empty()) soundLoad("");
+	musicPathShown=path;
+	soundSeek(sceneTime/60.0, paused);
+	return true;
+}
+
+//Decide what a dropped / chosen file is: a model, a motion (for the model
+//without one, else the selected model), a camera/light VMD (no bone or
+//morph keys), or music
+void Viewer::openFileAuto(const string &path, int targetModel)
+{
+	string lower=path;
+	for(char &c : lower) c=tolower((unsigned char)c);
+	auto ends=[&](const char *ext){ size_t n=strlen(ext); return lower.size()>=n && lower.compare(lower.size()-n, n, ext)==0; };
+	
+	if(ends(".pmx") || ends(".pmd"))
+	{
+		addModel(ModelSpec(path));
+	}
+	else if(ends(".vmd"))
+	{
+		ClosedMMDFormat::VMDInfo *info=NULL;
+		try { info=&readVMD(path); }
+		catch(const std::exception &e) { loadError=e.what(); return; }
+		bool motion=!info->boneFrames.empty() || !info->morphFrames.empty();
+		if(!motion && !info->cameraFrames.empty()) setCameraFile(path);
+		else if(!motion && !info->lightFrames.empty()) setLightFile(path);
+		else if(models.empty()) loadError=string("Load a model first for the motion ")+path;
+		else
+		{
+			int target=targetModel;
+			if(target<0 || target>=(int)models.size())
+			{
+				target=(int)models.size()-1;
+				for(size_t i=0; i<models.size(); ++i)
+				{
+					if(models[i]->spec.motionPath.empty()) { target=(int)i; break; }
+				}
+			}
+			setModelMotion(target, path);
+		}
+	}
+	else
+	{
+		setMusicFile(path);
+	}
+}
+
+void Viewer::processPendingLoads()
+{
+	std::vector<PendingLoad> loads;
+	loads.swap(pendingLoads);
+	for(const PendingLoad &l : loads)
+	{
+		switch(l.kind)
+		{
+			case PendingLoad::Auto:   openFileAuto(l.path, l.model); break;
+			case PendingLoad::Model:  addModel(ModelSpec(l.path)); break;
+			case PendingLoad::Motion: setModelMotion(l.model, l.path); break;
+			case PendingLoad::Camera: setCameraFile(l.path); break;
+			case PendingLoad::Light:  setLightFile(l.path); break;
+			case PendingLoad::Music:  setMusicFile(l.path); break;
+			case PendingLoad::Remove: removeModel(l.model); break;
+		}
+	}
 }
 
 int Viewer::currentTime() const
 {
-	return models.empty() ? 0 : models[0]->motionController->getTime();
+	return sceneTime;
 }
 
 glm::mat4 Viewer::modelMatrixFor(const SceneModel &m) const
@@ -220,7 +427,7 @@ glm::mat4 Viewer::modelMatrixFor(const SceneModel &m) const
 bool Viewer::modelShown(const SceneModel &m) const
 {
 	//A hides the models; so does the VMD "表示" (show) flag
-	return showModel && m.visible && glfwGetKey(window, GLFW_KEY_A)!=GLFW_PRESS && m.motionController->isModelVisible();
+	return showModel && m.visible && (guiCapturesKeyboard || glfwGetKey(window, GLFW_KEY_A)!=GLFW_PRESS) && m.motionController->isModelVisible();
 }
 
 void Viewer::updateSceneBounds()
@@ -254,9 +461,13 @@ void Viewer::stepLogic()
 {
 	bool doPhysics=physicsEnabled && !keyPressed(GLFW_KEY_Q);
 	
+	//nothing to play (no keys yet): only the physics runs, so that a motion
+	//loaded later starts from its beginning
+	bool advance=endTime>0;
+	if(advance) ++sceneTime;
 	for(SceneModel *m : models)
 	{
-		if (!m->motionController->advanceTime())
+		if (advance && !m->motionController->advanceTime())
 		{
 			m->motionController->updateVertexMorphs();
 			m->motionController->updateBoneAnimation();
@@ -275,6 +486,7 @@ void Viewer::seekTo(int t)
 {
 	if(t<0) t=0;
 	if(endTime>0 && t>endTime) t=endTime;
+	sceneTime=t;
 	for(SceneModel *m : models)
 	{
 		m->motionController->setTime(t);
@@ -1099,6 +1311,7 @@ void Viewer::initGLFW()
 	glfwSetCursorPosCallback(window, mouseMotion);
 	glfwSetScrollCallback(window, mouseWheel);
 	glfwSetKeyCallback(window, keyCallback);
+	glfwSetDropCallback(window, dropCallback);
 	
 	GLVersionMajor=glfwGetWindowAttrib(window, GLFW_CONTEXT_VERSION_MAJOR);
 	GLVersionMinor=glfwGetWindowAttrib(window, GLFW_CONTEXT_VERSION_MINOR);
@@ -1112,6 +1325,7 @@ void Viewer::initGLFW()
 
 bool Viewer::keyPressed(int key)
 {
+	if(guiCapturesKeyboard) return false;
 	return glfwGetKey(window, key)==GLFW_PRESS;
 }
 
@@ -1120,8 +1334,16 @@ bool Viewer::keyPressed(int key)
 struct KeyEvent { int key, mods; bool repeat; };
 static std::vector<KeyEvent> keyEvents;
 
+//Files dropped onto the window are loaded between frames
+static void dropCallback(GLFWwindow *window, int count, const char **paths)
+{
+	(void)window;
+	for(int i=0; i<count; ++i) droppedFiles.push_back(paths[i]);
+}
+
 static void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
+	if(guiCapturesKeyboard) return;
 	if(action==GLFW_PRESS || action==GLFW_REPEAT)
 	{
 		keyEvents.push_back(KeyEvent{key, mods, action==GLFW_REPEAT});
@@ -1283,6 +1505,11 @@ void Viewer::stepFrame(int direction)
 void Viewer::handleEvents()
 {
 	glfwPollEvents();
+	//loads requested in the previous frame (the GUI has shown "loading")
+	processPendingLoads();
+	for(const std::string &f : droppedFiles) pendingLoads.push_back(PendingLoad{PendingLoad::Auto, f, -1});
+	droppedFiles.clear();
+	if(!guiAvailable) processPendingLoads(); //no "loading" message to show first
 	guiFrame();
 	if(keyPressed(GLFW_KEY_R))
 	{
