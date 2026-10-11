@@ -624,7 +624,7 @@ namespace ClosedMMDFormat
 			uint32_t rbCount=r.u32();
 			if(rbCount>r.remaining()/83) fail(fname, "rigid body count");
 
-			//PMD rigid bodies without a bone are positioned relative to センター
+			//PMD rigid body positions are relative to their bone (センター if none)
 			int centerBone=boneCount>0 ? 0 : -1;
 			for(int i=0; i<boneCount; ++i)
 			{
@@ -649,9 +649,11 @@ namespace ClosedMMDFormat
 				rb->friction=r.f32();
 				rb->physicsOperation=r.u8();
 
-				int related=(bone<boneCount) ? (int)bone : centerBone;
-				rb->relatedBoneIndex=related;
-				rb->position=pos + (related>=0 ? info.bones[related]->position : glm::vec3(0.0f));
+				//Without a bone (0xFFFF) the position is relative to センター, but
+				//the body is not attached to it (it must not move the model).
+				int origin=(bone<boneCount) ? (int)bone : centerBone;
+				rb->relatedBoneIndex=(bone<boneCount) ? (int)bone : -1;
+				rb->position=pos + (origin>=0 ? info.bones[origin]->position : glm::vec3(0.0f));
 				info.rigidBodies.push_back(rb);
 			}
 			info.rigid_body_continuing_datasets=info.rigidBodies.size();

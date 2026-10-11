@@ -3,7 +3,7 @@
 pmx \- MikuMikuDance PMX/PMD model / VMD motion viewer (MikuMikuPenguin)
 .SH SYNOPSIS
 .B pmx
-[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] {\fImodel_file.pmx\fR|\fImodel_file.pmd\fR} \fImotion_file.vmd\fR
+[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] [\fB\-\-loop\fR] {\fImodel_file.pmx\fR|\fImodel_file.pmd\fR} \fImotion_file.vmd\fR
 .SH DESCRIPTION
 .B pmx
 (PMXViewer) is a demonstration program for the MikuMikuPenguin library
@@ -26,6 +26,10 @@ camera frames contained in the motion file, if any, are used.
 \fB\-l\fR \fIfile\fR
 Light motion (a VMD file with light frames).  Without this option the light
 frames of the \fB\-c\fR file are used, then those of the motion file.
+.TP
+\fB\-\-loop\fR
+Restart from the beginning when the end of the motion (its last key) is
+reached.
 .TP
 \fB\-\-help\fR
 display help and exit
@@ -54,6 +58,22 @@ Bullet debug drawing (wireframe, AABB, constraints, constraint limits)
 .TP
 .B C
 toggle the VMD camera motion (moving the camera with the mouse switches to the free camera)
+.TP
+.B Space
+pause / resume (the music too)
+.TP
+.B Left / Right
+seek 1 second back / forward (with Shift: 10 seconds); the physics restarts
+from the new pose
+.TP
+.B , / .
+one frame back / forward (pauses playback)
+.TP
+.B Home / End
+go to the beginning / end of the motion
+.TP
+.B O
+toggle looping
 .TP
 .B L
 toggle the VMD light motion (off: MMD default light)

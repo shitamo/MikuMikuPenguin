@@ -43,6 +43,7 @@ class Viewer
 	~Viewer();
 	
 	void run();
+	void setLoop(bool loop) { loopPlayback=loop; } //!< restart from the beginning at the end of the motion
 		
 	
 	private:
@@ -67,6 +68,15 @@ class Viewer
 	glm::vec3 modelMin, modelMax;
 	glm::mat4 viewMatrix, modelViewMatrix;
 	bool keyPressed(int key);
+	void handleKey(int key, int mods, bool repeat); //!< key press (or auto-repeat) from the GLFW key callback
+	
+	//***Playback control
+	bool paused;
+	bool loopPlayback;
+	int endTime;        //!< end of the motion in 1/60 s steps (last key)
+	void seekTo(int t); //!< jump to time t (1/60 s steps) and reset the physics to that pose
+	void stepLogic();   //!< advance the animation and physics by one 1/60 s step
+	void updateCameraUniforms();
 	void holdModelInBindPose();
 	
 	void drawModel(bool drawEdges);

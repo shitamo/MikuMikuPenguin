@@ -25,6 +25,9 @@
 #include "mmdphysics.h"
 
 #include "sound.h"
+#include <algorithm>
+
+static void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 
 #include "glfw_func_callbacks.h"
 
@@ -162,35 +165,71 @@ Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cam
 	if(useCameraMotion) cout<<"Using camera motion (press C to toggle)"<<endl;
 	useLightMotion=!lightController.empty();
 	if(useLightMotion) cout<<"Using light motion (press L to toggle)"<<endl;
+	
+	//Playback: the motion ends at its last key (bone, morph, camera or light)
+	paused=false;
+	loopPlayback=false;
+	{
+		unsigned last=motionController->lastKeyFrame();
+		last=std::max(last, cameraController.lastFrame());
+		last=std::max(last, lightController.lastFrame());
+		endTime=(int)last*2;
+	}
 	lastTheta=theta; lastZenith=zenith; lastRadius=radius;
 }
 
 void Viewer::handleLogic()
 {
-	bool doPhysics=true;
-	if(keyPressed(GLFW_KEY_Q))
+	if(!paused)
 	{
-		doPhysics=false;
-	}
-	
-	//if(!keyPressed(GLFW_KEY_A))
-	{
-		if (!motionController->advanceTime())
+		if(loopPlayback && endTime>0 && motionController->getTime()>=endTime)
 		{
-			motionController->updateVertexMorphs();
-			motionController->updateBoneAnimation();
+			seekTo(0);
 		}
-		//Debug- hold model in bind pose
-		//holdModelInBindPose();
-		
-		mmdPhysics->updateBones(doPhysics);
-		motionController->updateBoneMatrix();
-		
-		glUseProgram(bulletPhysics->debugDrawer->shaderProgram);
-		setCamera(bulletPhysics->debugDrawer->MVPLoc);
-		glUseProgram(shaderProgram);
-		setCamera(MVP_loc);
+		else
+		{
+			stepLogic();
+		}
 	}
+	updateCameraUniforms();
+}
+
+void Viewer::stepLogic()
+{
+	bool doPhysics=!keyPressed(GLFW_KEY_Q);
+	
+	if (!motionController->advanceTime())
+	{
+		motionController->updateVertexMorphs();
+		motionController->updateBoneAnimation();
+	}
+	//Debug- hold model in bind pose
+	//holdModelInBindPose();
+	
+	mmdPhysics->updateBones(doPhysics);
+	motionController->updateBoneMatrix();
+}
+
+void Viewer::updateCameraUniforms()
+{
+	glUseProgram(bulletPhysics->debugDrawer->shaderProgram);
+	setCamera(bulletPhysics->debugDrawer->MVPLoc);
+	glUseProgram(shaderProgram);
+	setCamera(MVP_loc);
+}
+
+void Viewer::seekTo(int t)
+{
+	if(t<0) t=0;
+	if(endTime>0 && t>endTime) t=endTime;
+	motionController->setTime(t);
+	motionController->updateVertexMorphs();
+	motionController->updateBoneAnimation();
+	//physics cannot be run backwards: restart it from the new pose
+	mmdPhysics->resetToCurrentPose();
+	motionController->updateBoneMatrix();
+	soundSeek(t/60.0, paused);
+	updateCameraUniforms();
 }
 
 void Viewer::render()
@@ -253,7 +292,8 @@ void Viewer::fpsCount()
 	{
 		int nbf_now = nbf_count % nbf_fps;
 		char title[128];
-		sprintf(title, "%s | %2d fps", window_name, nb_frames[nbf_now]);
+		snprintf(title, sizeof(title), "%s | %2d fps | frame %d / %d%s%s", window_name, nb_frames[nbf_now],
+		         std::min(motionController->getTime(), std::max(endTime, 0))/2, endTime/2, paused ? " | paused" : "", loopPlayback ? " | loop" : "");
 		glfwSetWindowTitle(window, title);
 		nb_frames[nbf_now] = 0;
 		last_time += seq;
@@ -296,10 +336,7 @@ void Viewer::run()
 		if(steps==MAX_STEPS_PER_FRAME) accumulator=0.0; //too slow to keep up: drop time instead of spiralling
 		if(steps==0) //still update the camera so mouse movement stays smooth
 		{
-			glUseProgram(bulletPhysics->debugDrawer->shaderProgram);
-			setCamera(bulletPhysics->debugDrawer->MVPLoc);
-			glUseProgram(shaderProgram);
-			setCamera(MVP_loc);
+			updateCameraUniforms();
 		}
 		render();
 		
@@ -793,6 +830,7 @@ void Viewer::initGLFW()
 	
 	glfwSetCursorPosCallback(window, mouseMotion);
 	glfwSetScrollCallback(window, mouseWheel);
+	glfwSetKeyCallback(window, keyCallback);
 	
 	GLVersionMajor=glfwGetWindowAttrib(window, GLFW_CONTEXT_VERSION_MAJOR);
 	GLVersionMinor=glfwGetWindowAttrib(window, GLFW_CONTEXT_VERSION_MINOR);
@@ -807,6 +845,19 @@ void Viewer::initGLFW()
 bool Viewer::keyPressed(int key)
 {
 	return glfwGetKey(window, key)==GLFW_PRESS;
+}
+
+//Key presses are queued by the GLFW key callback so that short taps (and the
+//auto-repeat of held keys) are not lost between two polls.
+struct KeyEvent { int key, mods; bool repeat; };
+static std::vector<KeyEvent> keyEvents;
+
+static void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
+{
+	if(action==GLFW_PRESS || action==GLFW_REPEAT)
+	{
+		keyEvents.push_back(KeyEvent{key, mods, action==GLFW_REPEAT});
+	}
 }
 
 GLuint Viewer::textureOrWhite(int index)
@@ -853,6 +904,71 @@ Viewer::~Viewer()
 	glfwTerminate();
 }
 
+void Viewer::handleKey(int key, int mods, bool repeat)
+{
+	bool shift=(mods & GLFW_MOD_SHIFT)!=0;
+	switch(key)
+	{
+		//C toggles the VMD camera motion
+		case GLFW_KEY_C:
+			if(repeat || cameraController.empty()) break;
+			useCameraMotion=!useCameraMotion;
+			cout<<(useCameraMotion ? "Camera motion ON" : "Camera motion OFF (free camera)")<<endl;
+			break;
+		
+		//L toggles the VMD light motion
+		case GLFW_KEY_L:
+			if(repeat || lightController.empty()) break;
+			useLightMotion=!useLightMotion;
+			cout<<(useLightMotion ? "Light motion ON" : "Light motion OFF (MMD default light)")<<endl;
+			break;
+		
+		//Space: pause / resume
+		case GLFW_KEY_SPACE:
+			if(repeat) break;
+			paused=!paused;
+			soundSetPaused(paused);
+			cout<<(paused ? "Paused" : "Playing")<<" at frame "<<motionController->getTime()/2<<endl;
+			break;
+		
+		//O: loop on/off
+		case GLFW_KEY_O:
+			if(repeat) break;
+			loopPlayback=!loopPlayback;
+			cout<<"Loop "<<(loopPlayback ? "ON" : "OFF")<<endl;
+			break;
+		
+		//Left/Right: seek 1 s (30 frames), with Shift 10 s
+		case GLFW_KEY_RIGHT:
+			seekTo(motionController->getTime()+(shift ? 600 : 60));
+			break;
+		case GLFW_KEY_LEFT:
+			seekTo(motionController->getTime()-(shift ? 600 : 60));
+			break;
+		
+		//Home/End: beginning / end of the motion
+		case GLFW_KEY_HOME:
+			seekTo(0);
+			break;
+		case GLFW_KEY_END:
+			seekTo(endTime);
+			break;
+		
+		//Period/Comma: one frame forward/back (pauses playback)
+		case GLFW_KEY_PERIOD:
+			if(!paused) { paused=true; soundSetPaused(true); }
+			stepLogic(); //forward steps keep the physics running continuously
+			stepLogic();
+			soundSeek(motionController->getTime()/60.0, true);
+			updateCameraUniforms();
+			break;
+		case GLFW_KEY_COMMA:
+			if(!paused) { paused=true; soundSetPaused(true); }
+			seekTo(motionController->getTime()-2);
+			break;
+	}
+}
+
 void Viewer::handleEvents()
 {
 	glfwPollEvents();
@@ -862,25 +978,10 @@ void Viewer::handleEvents()
 		useCameraMotion=false;
 	}
 	
-	//C toggles the VMD camera motion (edge-triggered)
-	static bool cWasDown=false;
-	bool cDown=glfwGetKey(window, GLFW_KEY_C)==GLFW_PRESS;
-	if(cDown && !cWasDown && !cameraController.empty())
-	{
-		useCameraMotion=!useCameraMotion;
-		cout<<(useCameraMotion ? "Camera motion ON" : "Camera motion OFF (free camera)")<<endl;
-	}
-	cWasDown=cDown;
-	
-	//L toggles the VMD light motion (edge-triggered)
-	static bool lWasDown=false;
-	bool lDown=glfwGetKey(window, GLFW_KEY_L)==GLFW_PRESS;
-	if(lDown && !lWasDown && !lightController.empty())
-	{
-		useLightMotion=!useLightMotion;
-		cout<<(useLightMotion ? "Light motion ON" : "Light motion OFF (MMD default light)")<<endl;
-	}
-	lWasDown=lDown;
+	//one-shot keys (playback control, toggles)
+	std::vector<KeyEvent> events;
+	events.swap(keyEvents);
+	for(const KeyEvent &e : events) handleKey(e.key, e.mods, e.repeat);
 	
 	//moving the camera with the mouse switches to the free camera
 	if(useCameraMotion && (theta!=lastTheta || zenith!=lastZenith || radius!=lastRadius))

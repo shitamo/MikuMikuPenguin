@@ -1,3 +1,13 @@
+October 11, 2026 (playback control):
+-Pause (Space), seek (Left/Right 1 s, Shift 10 s, Home/End), frame step
+ (, and .) and loop (O, --loop). Seeking restarts the physics from the
+ new pose and moves the music; the window title shows the frame.
+ libmmp: VMDMotionController::setTime() and lastKeyFrame()
+-Keys are read through a GLFW key callback so short presses are not lost
+-SDL2_mixer: WAV music is played as a chunk so that it can be seeked
+-PMD: rigid bodies without a bone are no longer attached to センター
+ (physics bodies of the skirt rotated the whole model)
+
 October 11, 2026 (PMD):
 -PMD models are loaded (converted to the PMX structures): BDEF2 skinning,
  "texture*sphere" names, model toon lists (standard toons are shared),

@@ -1,3 +1,10 @@
+mikumikupenguin (0.2.1+20261011.7) unstable; urgency=medium
+
+  * Pause, seek, frame step and loop playback (--loop); the music follows.
+  * PMD: do not attach bone-less rigid bodies to センター.
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 18:10:00 +0900
+
 mikumikupenguin (0.2.1+20261011.6) unstable; urgency=medium
 
   * Load PMD models (bones, IK, morphs, toons, rigid bodies, joints).

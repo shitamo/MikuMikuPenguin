@@ -35,6 +35,7 @@ void printHelpInfo()
 	<<"\tIf libmmp was compiled without SDL2_mixer support, no music will play."<<endl<<endl
 	<<"  -c\tCamera motion VMD (camera frames in the motion VMD are used otherwise)"<<endl
 	<<"  -l\tLight motion VMD (otherwise light frames from the -c VMD, then the motion VMD)"<<endl
+	<<"  --loop\tRestart from the beginning at the end of the motion"<<endl
 	<<"  --help\tdisplay this help and exit"<<endl
 	<<"  --version\toutput version information and exit"<<endl<<endl
 	<<"Controls:"<<endl
@@ -43,6 +44,9 @@ void printHelpInfo()
 	<<"  A (hold)\thide model          S/D/F/G (hold)\tBullet debug drawing"<<endl
 	<<"  R\t\treset camera       C\tcamera motion on/off"<<endl
 	<<"  L\t\tlight motion on/off"<<endl
+	<<"  Space\t\tpause/resume       O\tloop on/off"<<endl
+	<<"  Left/Right\tseek 1 s (Shift: 10 s)   , .\tone frame back/forward"<<endl
+	<<"  Home/End\tbeginning/end of the motion"<<endl
 	<<"  Esc\t\tquit"<<endl<<endl
 	<<"FOR JAPANESE DOCUMENTATION, SEE:"<<endl
 	<<"<file://"<<DATA_PATH<<"/doc/README_JP.html>"<<endl<<endl
@@ -65,6 +69,7 @@ int main(int argc, char** argv)
 	string music_file="";
 	string camera_file="";
 	string light_file="";
+	bool loop=false;
 	
 	int count=0;
 	if(argc > 1)
@@ -84,6 +89,10 @@ int main(int argc, char** argv)
 			else if(string(argv[count]) == "-s")
 			{
 				if(count+1<argc) music_file=argv[++count];
+			}
+			else if(string(argv[count]) == "--loop")
+			{
+				loop=true;
 			}
 			else if(string(argv[count]) == "-l")
 			{
@@ -132,6 +141,7 @@ int main(int argc, char** argv)
 	
 	Viewer viewer(model_file,motion_file,music_file,camera_file,light_file);
 	
+	viewer.setLoop(loop);
 	viewer.run();
 	
 	delete pmxvLogger::get();	

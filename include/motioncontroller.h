@@ -107,6 +107,13 @@ class VMDMotionController
 	//! Current animation time in 1/60 s steps (VMD frame = time/2)
 	int getTime() const { return time; }
 	
+	/*! Jump to time t (1/60 s steps, VMD frame = t/2).  Call
+	 *  updateVertexMorphs() and updateBoneAnimation() afterwards (and reset
+	 *  the physics) to show the pose of that time. */
+	void setTime(int t);
+	//! Frame (30 fps) of the last bone or morph key of the motion
+	unsigned lastKeyFrame() const;
+	
 	//! Model visibility from the VMD "show/IK" frames ("表示") at the current time
 	bool isModelVisible() const;
 	//! Whether the IK of bone boneIndex is enabled by the VMD "show/IK" frames at the current time

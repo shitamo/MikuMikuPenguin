@@ -23,6 +23,7 @@ class VMDLightController
 	explicit VMDLightController(const std::vector<ClosedMMDFormat::VMDLightFrame> &frames);
 
 	bool empty() const { return keys.empty(); }
+	unsigned lastFrame() const { return keys.empty() ? 0 : keys.back().frame; }
 
 	//! Evaluate the light at a (fractional) 30 fps VMD frame.
 	MMDLightState evaluate(float frame) const;

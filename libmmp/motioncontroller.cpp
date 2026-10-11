@@ -765,6 +765,49 @@ void VMDMotionController::updateIK()
 	}
 }
 
+//Iterator at the last key whose time (frame*2) is <= t, or begin() if none.
+//This is the state updateBoneAnimation()/updateVertexMorphs() keep while
+//playing forwards.
+template<class List>
+static typename List::iterator keyAtTime(List &keys, int t)
+{
+	typename List::iterator it=keys.begin(), found=keys.begin();
+	for(; it!=keys.end(); ++it)
+	{
+		if((long)it->frame*2 > (long)t) break;
+		found=it;
+	}
+	return found;
+}
+
+void VMDMotionController::setTime(int t)
+{
+	if(t<0) t=0;
+	time=t;
+	for(unsigned i=0; i<boneKeyFrames.size(); ++i)
+	{
+		ite_boneKeyFrames[i]=keyAtTime(boneKeyFrames[i], t);
+	}
+	for(unsigned i=0; i<morphKeyFrames.size(); ++i)
+	{
+		ite_morphKeyFrames[i]=keyAtTime(morphKeyFrames[i], t);
+	}
+}
+
+unsigned VMDMotionController::lastKeyFrame() const
+{
+	unsigned last=0;
+	for(const auto &keys : boneKeyFrames)
+	{
+		if(!keys.empty()) last=std::max(last, keys.back().frame);
+	}
+	for(const auto &keys : morphKeyFrames)
+	{
+		if(!keys.empty()) last=std::max(last, keys.back().frame);
+	}
+	return last;
+}
+
 bool VMDMotionController::advanceTime()
 {
 	++time;
