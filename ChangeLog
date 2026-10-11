@@ -1,3 +1,13 @@
+October 11, 2026 (shadows):
+-Ground shadow: the model flattened onto y=0 along the light, drawn once
+ per pixel with the stencil buffer (materials with the ground shadow flag)
+-Self shadow: shadow map from the light fitted to the current pose, 3x3
+ PCF, MMD's full.fx blending (min(saturate(N.L*3), visibility) between the
+ lit colour and the colour multiplied by the darkest toon colour);
+ honours the material self shadow flags and the VMD self shadow on/off
+ keys (mode 1/2 and the shadow distance are not distinguished)
+-Z / X toggle the ground / self shadow
+
 October 11, 2026 (playback control):
 -Pause (Space), seek (Left/Right 1 s, Shift 10 s, Home/End), frame step
  (, and .) and loop (O, --loop). Seeking restarts the physics from the

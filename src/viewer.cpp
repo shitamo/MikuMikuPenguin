@@ -92,6 +92,7 @@ Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cam
 	
 
 	initUniformVarLocations();
+	initShadowMap();
 	
 	MVP_loc = glGetUniformLocation(shaderProgram, "MVP");
     
@@ -166,6 +167,23 @@ Viewer::Viewer(string modelPath, string motionPath, string musicPath, string cam
 	useLightMotion=!lightController.empty();
 	if(useLightMotion) cout<<"Using light motion (press L to toggle)"<<endl;
 	
+	//Shadows (MMD defaults: ground shadow and self shadow on).  The self
+	//shadow on/off keys come from the camera VMD if it has them, otherwise
+	//from the motion VMD.
+	useGroundShadow=true;
+	useSelfShadow=true;
+	{
+		std::vector<ClosedMMDFormat::VMDSelfShadowFrame> frames=vmdInfo->selfShadowFrames;
+		if(!cameraPath.empty())
+		{
+			ClosedMMDFormat::VMDInfo &camInfo=readVMD(cameraPath);
+			if(!camInfo.selfShadowFrames.empty()) frames=camInfo.selfShadowFrames;
+		}
+		std::stable_sort(frames.begin(), frames.end(),
+			[](const ClosedMMDFormat::VMDSelfShadowFrame &a, const ClosedMMDFormat::VMDSelfShadowFrame &b){ return a.frame<b.frame; });
+		for(const auto &f : frames) selfShadowKeys.push_back(std::make_pair(f.frame, f.type!=0));
+	}
+	
 	//Playback: the motion ends at its last key (bone, morph, camera or light)
 	paused=false;
 	loopPlayback=false;
@@ -237,6 +255,19 @@ void Viewer::render()
 	//A hides the model; so does the VMD "表示" (show) flag
 	if(!keyPressed(GLFW_KEY_A) && motionController->isModelVisible())
 	{
+		MMDLightState light=currentLight();
+		glm::mat4 shadowMVP(1.0f);
+		if(selfShadowActive())
+		{
+			glm::mat4 lightVP=lightViewProjection(light.direction);
+			renderShadowMap(lightVP);
+			//clip space [-1,1] -> texture space [0,1]
+			glm::mat4 bias=glm::translate(glm::vec3(0.5f))*glm::scale(glm::vec3(0.5f));
+			shadowMVP=bias*lightVP*modelMatrix;
+		}
+		glUniformMatrix4fv(uniformVars[uShadowMVP],1,GL_FALSE,&shadowMVP[0][0]);
+		if(useGroundShadow) drawGroundShadow(light.direction);
+		
 		drawModel(false); //draw model
 		drawModel(true); //draw outlines (MMD draws them after the model, depth tested)
 		glDisable(GL_CULL_FACE);
@@ -316,7 +347,7 @@ void Viewer::run()
 	{
 		glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
 		glViewport(0, 0, framebufferWidth, framebufferHeight);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 		
 		double now=glfwGetTime();
 		accumulator+=now-lastTime;
@@ -365,6 +396,9 @@ void Viewer::setCamera(GLuint MVPLoc)
 		glm::mat4 MVP = Projection * View;
 		viewMatrix = View;
 		modelViewMatrix = View;
+		projectionMatrix = Projection;
+		modelMatrix = glm::mat4(1.0f);
+		mvpMatrix = MVP;
 		glUniformMatrix4fv(MVPLoc, 1, GL_FALSE, &MVP[0][0]);
 		return;
 	}
@@ -386,6 +420,9 @@ void Viewer::setCamera(GLuint MVPLoc)
 	glm::mat4 MVP = Projection * View * Model;
 	viewMatrix = View;
 	modelViewMatrix = View * Model;
+	projectionMatrix = Projection;
+	modelMatrix = Model;
+	mvpMatrix = MVP;
 	
 	glUniformMatrix4fv(MVPLoc, 1, GL_FALSE, &MVP[0][0]);
 }
@@ -446,14 +483,14 @@ void Viewer::drawModel(bool drawEdges)
 	//(left-handed) coordinates = (-0.5,-1.0,-0.5) here.  Lighting is done in
 	//view space.
 	//VMD light motion replaces both when enabled.
-	MMDLightState light = useLightMotion ? lightController.evaluate(motionController->getTime()/2.0f)
-	                                     : VMDLightController::defaultLight();
+	MMDLightState light = currentLight();
 	glm::vec3 lightDirView=glm::normalize(glm::mat3(viewMatrix)*light.direction);
 	glUniform3f(uniformVars[uLightDirection],lightDirView.x,lightDirView.y,lightDirView.z);
 	glUniform3f(uniformVars[uLightColor],light.color.r,light.color.g,light.color.b);
 	glUniformMatrix4fv(uniformVars[uMV],1,GL_FALSE,&modelViewMatrix[0][0]);
 	glUniform2f(uniformVars[uScreenSize],(float)framebufferWidth,(float)framebufferHeight);
 	
+	bool selfShadowNow=selfShadowActive();
 	int faceCount=0;
 	for(int m=0; m<pmxInfo->material_continuing_datasets; ++m) //pmxInfo->material_continuing_datasets
 	{
@@ -521,6 +558,7 @@ void Viewer::drawModel(bool drawEdges)
 		int sphereIdx=pmxInfo->materials[m]->sphereIndex;
 		bool hasSphere = sphereIdx>=0 && sphereIdx<(int)textures.size()-10;
 		glUniform1f(uniformVars[uSphereMode], hasSphere ? (float)pmxInfo->materials[m]->sphereMode : 0.0f);
+		glUniform1i(uniformVars[uSelfShadow], (selfShadowNow && !drawEdges && pmxInfo->materials[m]->drawSelfShadow) ? 1 : 0);
         
 		if(drawEdges)
 		{
@@ -539,6 +577,185 @@ void Viewer::drawModel(bool drawEdges)
 				glDrawElements(GL_TRIANGLES, (pmxInfo->materials[m]->hasFaceNum), GL_UNSIGNED_INT, BUFFER_OFFSET(sizeof(GLuint)*faceCount));
 		faceCount+=pmxInfo->materials[m]->hasFaceNum;
 	}
+}
+
+
+MMDLightState Viewer::currentLight()
+{
+	return useLightMotion ? lightController.evaluate(motionController->getTime()/2.0f)
+	                      : VMDLightController::defaultLight();
+}
+
+bool Viewer::selfShadowActive()
+{
+	if(!useSelfShadow || !shadowFBO) return false;
+	if(selfShadowKeys.empty()) return true;
+	unsigned frame=(unsigned)(motionController->getTime()/2);
+	bool on=selfShadowKeys.front().second;
+	for(const auto &k : selfShadowKeys)
+	{
+		if(k.first>frame) break;
+		on=k.second;
+	}
+	return on;
+}
+
+void Viewer::initShadowMap()
+{
+	shadowFBO=0;
+	shadowTexture=0;
+	shadowMapSize=2048;
+	
+	glActiveTexture(GL_TEXTURE0 + SHADOW_TEXTURE_UNIT);
+	glGenTextures(1, &shadowTexture);
+	glBindTexture(GL_TEXTURE_2D, shadowTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, shadowMapSize, shadowMapSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	const float border[4]={1.0f, 1.0f, 1.0f, 1.0f}; //outside the map = lit
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	glActiveTexture(GL_TEXTURE0);
+	
+	glGenFramebuffers(1, &shadowFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowTexture, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)
+	{
+		cerr<<"WARNING: shadow map framebuffer not supported; self shadow disabled"<<endl;
+		glDeleteFramebuffers(1, &shadowFBO);
+		shadowFBO=0;
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	
+	//the sampler always has the depth texture bound (also when unused)
+	glUniform1i(uniformVars[uShadowMap], SHADOW_TEXTURE_UNIT);
+	glUniform2f(uniformVars[uShadowTexelSize], 1.0f/shadowMapSize, 1.0f/shadowMapSize);
+	glUniform1i(uniformVars[uRenderMode], 0);
+	glUniform1i(uniformVars[uSelfShadow], 0);
+	glUniform4f(uniformVars[uGroundShadowColor], 0.0f, 0.0f, 0.0f, 0.4f);
+	glm::mat4 identity(1.0f);
+	glUniformMatrix4fv(uniformVars[uShadowMVP], 1, GL_FALSE, &identity[0][0]);
+	
+	//the ground shadow uses the stencil buffer so that overlapping parts
+	//do not darken it twice
+	GLint stencilBits=0;
+	glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_STENCIL, GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE, &stencilBits);
+	hasStencil=stencilBits>0;
+}
+
+//Orthographic light camera fitted to the current pose (bone positions plus
+//a margin for the mesh around them).  The fit is snapped to whole shadow
+//map texels so that the shadow edges do not shimmer while the model moves.
+glm::mat4 Viewer::lightViewProjection(const glm::vec3 &lightDir)
+{
+	glm::vec3 bmin(1e30f), bmax(-1e30f);
+	for(int i=0; i<pmxInfo->bone_continuing_datasets; ++i)
+	{
+		glm::vec3 p=glm::vec3(modelMatrix*pmxInfo->bones[i]->calculateGlobalMatrix()[3]);
+		if(!(glm::length(p)<1e6f)) continue; //ignore broken (NaN/far) bones
+		bmin=glm::min(bmin, p);
+		bmax=glm::max(bmax, p);
+	}
+	if(bmin.x>bmax.x) { bmin=modelMin; bmax=modelMax; }
+	glm::vec3 centre=(bmin+bmax)*0.5f;
+	float radius=glm::length(bmax-bmin)*0.5f + glm::length(modelMax-modelMin)*0.2f;
+	radius=glm::max(1.0f, ceilf(radius*2.0f)*0.5f);
+	
+	glm::vec3 d=glm::normalize(lightDir);
+	glm::vec3 up=(fabsf(d.y)>0.99f) ? glm::vec3(0.0f, 0.0f, 1.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+	glm::mat4 lightView=glm::lookAt(glm::vec3(0.0f), d, up);
+	
+	glm::vec3 c=glm::vec3(lightView*glm::vec4(centre, 1.0f));
+	float texel=2.0f*radius/shadowMapSize;
+	c.x=floorf(c.x/texel)*texel;
+	c.y=floorf(c.y/texel)*texel;
+	//view space looks down -Z: the model is around z=c.z
+	glm::mat4 lightProj=glm::ortho(c.x-radius, c.x+radius, c.y-radius, c.y+radius, -c.z-3.0f*radius, -c.z+3.0f*radius);
+	return lightProj*lightView;
+}
+
+void Viewer::drawShadowCasters(int renderMode)
+{
+	glBindVertexArray(VAOs[Vertices]);
+	glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[VertexIndexBuffer]);
+	glUniform1i(uniformVars[uIsEdge], 0);
+	glUniform1i(uniformVars[uRenderMode], renderMode);
+	
+	int faceCount=0;
+	for(int m=0; m<pmxInfo->material_continuing_datasets; ++m)
+	{
+		const PMXMaterial *pm=pmxInfo->materials[m];
+		const VMDMotionController::MaterialState &mat=motionController->materialStates[m];
+		bool draw = mat.diffuse.a>0.0f &&
+		            (renderMode==1 ? pm->drawToSelfShadowMap : pm->drawGroundShadow);
+		if(draw)
+		{
+			glDrawElements(GL_TRIANGLES, pm->hasFaceNum, GL_UNSIGNED_INT, BUFFER_OFFSET(sizeof(GLuint)*faceCount));
+		}
+		faceCount+=pm->hasFaceNum;
+	}
+	glUniform1i(uniformVars[uRenderMode], 0);
+}
+
+void Viewer::renderShadowMap(const glm::mat4 &lightVP)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+	glViewport(0, 0, shadowMapSize, shadowMapSize);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+	glDepthMask(GL_TRUE);
+	glDisable(GL_BLEND);
+	glDisable(GL_CULL_FACE);
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(1.5f, 4.0f);
+	
+	glm::mat4 MVP=lightVP*modelMatrix;
+	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &MVP[0][0]);
+	drawShadowCasters(1);
+	
+	glDisable(GL_POLYGON_OFFSET_FILL);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, framebufferWidth, framebufferHeight);
+	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &mvpMatrix[0][0]);
+}
+
+//MMD's ground shadow: the model flattened onto the y=0 plane along the light
+void Viewer::drawGroundShadow(const glm::vec3 &lightDir)
+{
+	glm::vec3 d=glm::normalize(lightDir);
+	if(d.y > -0.05f) return; //light from (nearly) below/horizontal: no ground shadow
+	
+	glm::mat4 flatten(1.0f); //p' = p - d * p.y/d.y
+	flatten[1][0]=-d.x/d.y;
+	flatten[1][1]=0.0f;
+	flatten[1][2]=-d.z/d.y;
+	glm::mat4 MVP=projectionMatrix*viewMatrix*flatten*modelMatrix;
+	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &MVP[0][0]);
+	
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+	glDepthMask(GL_FALSE);
+	glDisable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	if(hasStencil)
+	{
+		glEnable(GL_STENCIL_TEST);
+		glStencilFunc(GL_EQUAL, 0, 0xFF);
+		glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
+	}
+	drawShadowCasters(2);
+	if(hasStencil) glDisable(GL_STENCIL_TEST);
+	glDepthMask(GL_TRUE);
+	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &mvpMatrix[0][0]);
 }
 
 
@@ -799,6 +1016,7 @@ void Viewer::initGLFW()
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //Don't want old OpenGL
 	glfwWindowHint(GLFW_DEPTH_BITS, 32);
+	glfwWindowHint(GLFW_STENCIL_BITS, 8); //ground shadow (draw each pixel once)
 	
 	//Open a window and create its OpenGL context
 	window = glfwCreateWindow(1280, 720, "PMX Viewer", NULL, NULL);
@@ -891,6 +1109,12 @@ void Viewer::initUniformVarLocations()
 	uniformVars[uLightColor]=glGetUniformLocation(shaderProgram,"lightColor");
 	uniformVars[uUseToon]=glGetUniformLocation(shaderProgram,"useToon");
 	uniformVars[uMV]=glGetUniformLocation(shaderProgram,"MV");
+	uniformVars[uRenderMode]=glGetUniformLocation(shaderProgram,"renderMode");
+	uniformVars[uGroundShadowColor]=glGetUniformLocation(shaderProgram,"groundShadowColor");
+	uniformVars[uSelfShadow]=glGetUniformLocation(shaderProgram,"selfShadow");
+	uniformVars[uShadowMap]=glGetUniformLocation(shaderProgram,"shadowMap");
+	uniformVars[uShadowTexelSize]=glGetUniformLocation(shaderProgram,"shadowTexelSize");
+	uniformVars[uShadowMVP]=glGetUniformLocation(shaderProgram,"shadowMVP");
 	uniformVars[uScreenSize]=glGetUniformLocation(shaderProgram,"screenSize");
 	uniformVars[uSphereMul]=glGetUniformLocation(shaderProgram,"sphereMul");
 	uniformVars[uSphereAdd]=glGetUniformLocation(shaderProgram,"sphereAdd");
@@ -921,6 +1145,18 @@ void Viewer::handleKey(int key, int mods, bool repeat)
 			if(repeat || lightController.empty()) break;
 			useLightMotion=!useLightMotion;
 			cout<<(useLightMotion ? "Light motion ON" : "Light motion OFF (MMD default light)")<<endl;
+			break;
+		
+		//Z: ground shadow on/off, X: self shadow on/off
+		case GLFW_KEY_Z:
+			if(repeat) break;
+			useGroundShadow=!useGroundShadow;
+			cout<<"Ground shadow "<<(useGroundShadow ? "ON" : "OFF")<<endl;
+			break;
+		case GLFW_KEY_X:
+			if(repeat) break;
+			useSelfShadow=!useSelfShadow;
+			cout<<"Self shadow "<<(useSelfShadow ? "ON" : "OFF")<<endl;
 			break;
 		
 		//Space: pause / resume

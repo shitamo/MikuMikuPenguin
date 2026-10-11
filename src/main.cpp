@@ -44,6 +44,7 @@ void printHelpInfo()
 	<<"  A (hold)\thide model          S/D/F/G (hold)\tBullet debug drawing"<<endl
 	<<"  R\t\treset camera       C\tcamera motion on/off"<<endl
 	<<"  L\t\tlight motion on/off"<<endl
+	<<"  Z\t\tground shadow on/off   X\tself shadow on/off"<<endl
 	<<"  Space\t\tpause/resume       O\tloop on/off"<<endl
 	<<"  Left/Right\tseek 1 s (Shift: 10 s)   , .\tone frame back/forward"<<endl
 	<<"  Home/End\tbeginning/end of the motion"<<endl

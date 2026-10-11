@@ -10,7 +10,8 @@ pmx \- MikuMikuDance PMX/PMD model / VMD motion viewer (MikuMikuPenguin)
 (libmmp).  It loads a PMX 2.0 or PMD model and plays a VMD motion on it, with
 Bullet physics for hair, skirts and other rigid bodies.
 Camera and light motion are played, and the model visibility and IK on/off
-keys of the motion file are honoured.
+keys of the motion file are honoured.  Like MMD, the model casts a ground
+shadow and a self shadow (shadow map) following the light.
 .PP
 An OpenGL 3.2 core profile capable driver is required.
 .SH OPTIONS
@@ -74,6 +75,12 @@ go to the beginning / end of the motion
 .TP
 .B O
 toggle looping
+.TP
+.B Z
+toggle the ground shadow
+.TP
+.B X
+toggle the self shadow (also switched by the self shadow keys of the VMD)
 .TP
 .B L
 toggle the VMD light motion (off: MMD default light)

@@ -23,7 +23,11 @@ enum Uniform_IDs {
 	uTextureMul,uTextureAdd,
 	uLightColor,uUseToon,uMV,uScreenSize,
 	uSphereMul,uSphereAdd,uToonMul,uToonAdd,
+	uRenderMode,uGroundShadowColor,uSelfShadow,uShadowMap,uShadowTexelSize,uShadowMVP,
 	NumUniforms };
+
+//Texture unit of the self-shadow depth map (0-2 material textures, 3 bones)
+#define SHADOW_TEXTURE_UNIT 4
 
 namespace ClosedMMDFormat
 {
@@ -80,6 +84,20 @@ class Viewer
 	void holdModelInBindPose();
 	
 	void drawModel(bool drawEdges);
+	
+	//***Shadows
+	bool useGroundShadow, useSelfShadow, hasStencil;
+	GLuint shadowFBO, shadowTexture;
+	int shadowMapSize;
+	glm::mat4 projectionMatrix, modelMatrix, mvpMatrix; //set by setCamera()
+	std::vector<std::pair<unsigned,bool>> selfShadowKeys; //VMD self shadow on/off (frame, on)
+	void initShadowMap();
+	MMDLightState currentLight();
+	bool selfShadowActive();
+	glm::mat4 lightViewProjection(const glm::vec3 &lightDir); //world -> light clip space
+	void drawShadowCasters(int renderMode); //geometry only, for the shadow passes
+	void renderShadowMap(const glm::mat4 &lightVP);
+	void drawGroundShadow(const glm::vec3 &lightDir);
 	
 	
 	GLFWwindow *window;

@@ -17,9 +17,11 @@ in vec3 vSdefR1; //SDEF pre-processed rotation centre for bone 2
 out vec2 UV;
 out vec3 normal;   //view-space normal
 out vec3 viewPos;  //view-space position
+out vec4 shadowCoord; //position in the self-shadow map ([0,1] texture coordinates + depth)
 
 uniform mat4 MVP;
 uniform mat4 MV;          //model-view matrix (for lighting / sphere maps)
+uniform mat4 shadowMVP;   //model -> self-shadow map coordinates
 uniform vec2 screenSize;  //framebuffer size in pixels (for edge width)
 uniform samplerBuffer boneTexture; //skinning matrices, 4 RGBA32F texels per bone
 
@@ -167,6 +169,7 @@ void main()
 		UV = vUV;
 		normal = viewNormal;
 		viewPos = (MV * vec4(newVertex.xyz, 1.0)).xyz;
+		shadowCoord = vec4(0.0);
 		return;
 	}
 	
@@ -174,4 +177,5 @@ void main()
 	UV          = vUV;
 	normal      = viewNormal;
 	viewPos     = (MV * vec4(newVertex.xyz, 1.0)).xyz;
+	shadowCoord = shadowMVP * vec4(newVertex.xyz, 1.0);
 }
