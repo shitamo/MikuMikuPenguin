@@ -17,7 +17,6 @@ Build-Depends: debhelper-compat (= 13),
                libsdl3-mixer-dev | libsdl2-mixer-dev
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
-Homepage: https://github.com/weimingtom/MMP
 
 Package: mikumikupenguin
 Architecture: any

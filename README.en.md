@@ -5,10 +5,12 @@ I wanted to MikuMiku on my favorite operating system, so I wrote a program to do
 It's still very buggy, and the API isn't particularly fixed in any manner so it's still too early to effectively use MMP as a library.
 However, I hope that this becomes a starting point for the development of MMD on operating systems other than Windows (although you actually can use this library in Windows).
 
-You should be able to get the latest version of the source code here:
-https://github.com/sn0w75/MikuMikuPenguin/
+(The above is the original description by the original author, sn0w75. Original code: https://github.com/sn0w75/MikuMikuPenguin/ )
 
 ## 2026 modernisation
+
+This modified version is published as is: bug reports, requests and patches are not accepted.
+If you want to change it, please modify it yourself under the license (GPL-3, see COPYING).
 
 This tree is based on v0.2.1 with the following changes so that it builds and runs on current Linux:
 
@@ -55,11 +57,3 @@ To install libmmp and PMXViewer on your system, run:
 
 Use `meson setup build -Dsound=disabled -Dgui=disabled` to build without music playback or on-screen controls.
 A Debian package can be built with `dpkg-buildpackage -us -uc -b`.
-
-(There may be an alternative to 'sudo' you need to use depending on your distro to run a process with admin privileges.)
-
-If you have any other questions, please toss me a message. I'll gladly help you out.
-* Twitter [@sn0w75](http://twitter.com/sn0w75)
-* E-mail <ibenrunnin@gmail.com>
-
-

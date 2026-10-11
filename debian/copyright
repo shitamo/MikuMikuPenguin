@@ -1,10 +1,9 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: MikuMikuPenguin
-Upstream-Contact: Ben Clapp (sn0w75) <ibenrunnin@gmail.com>
 Source: https://github.com/weimingtom/MMP
 
 Files: *
-Copyright: 2013-2014 Ben Clapp (sn0w75) <ibenrunnin@gmail.com>
+Copyright: 2013-2014 Ben Clapp (sn0w75)
            2014 MikuMikuPenguin contributors (see git history)
            2026 shitamo <sitamo@gmail.com>
 License: GPL-3

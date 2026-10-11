@@ -58,8 +58,7 @@ void printHelpInfo()
 	<<"  Tab\t\tshow/hide the on-screen controls"<<endl
 	<<"  Esc\t\tquit"<<endl<<endl
 	<<"FOR JAPANESE DOCUMENTATION, SEE:"<<endl
-	<<"<file://"<<DATA_PATH<<"/doc/README_JP.html>"<<endl<<endl
-	<<"Report bugs to <ibenrunnin@gmail.com> (English or Japanese is ok)."<<endl;
+	<<"<file://"<<DATA_PATH<<"/doc/README_JP.html>"<<endl;
 }
 
 void printVersionInfo()
@@ -68,7 +67,7 @@ void printVersionInfo()
 	<<"Copyright (C) 2014 Ben Clapp (sn0w75)"<<endl
      <<"This is free software; see the source for copying conditions.  There is NO"<<endl
      <<"warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."<<endl
-     <<"Written by Ben Clapp (sn0w75), <ibenrunnin@gmail.com>."<<endl<<endl;
+     <<"Written by Ben Clapp (sn0w75); modified in 2026."<<endl<<endl;
 }
 
 int main(int argc, char** argv)

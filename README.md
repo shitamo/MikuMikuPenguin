@@ -4,7 +4,7 @@ THIS FILE IS ENCODED IN UTF-8, NOT SJIS!!!
 **注意**
 このファイルはSJISではなくUTF-8でエンコードされています！！！
 
-English translation is [available](http://github.com/sn0w75/mikumikupenguin/blob/master/README.en.md).
+English translation is available in [README.en.md](README.en.md).
 
 # LibMikuMikuPenguin(libmmp) v0.2 リードミ（日本語）
 
@@ -14,10 +14,12 @@ English translation is [available](http://github.com/sn0w75/mikumikupenguin/blob
 まだバグだらけですし、APIが確定しているわけでもないのでMMPをライブラリとして使うのはまだまだ早いかと思います。
 ですが、これを起点として、Windows以外のOSでのMMDの開発が段々進めていったら～と思ってます。
 
-最新のコードは以下のリンクで手に入れます：
-https://github.com/sn0w75/MikuMikuPenguin/
+（以上は原作者 sn0w75 氏による元の説明です。元のコード: https://github.com/sn0w75/MikuMikuPenguin/ ）
 
 ## 2026年 現行環境対応版について
+
+この版は改変版として公開しているもので、不具合報告・要望・修正の受け付けはしていません。
+改変して使いたい方は、ライセンス（GPL-3、COPYING）に従って各自で修正してお使いください。
 
 このツリーは v0.2.1 をベースに、現在の Linux で動くよう次の変更を加えたものです。
 
@@ -66,8 +68,4 @@ PMXViewer（PMX/PMDモデル対応）には libmmp と stb_image（libstb）が�
 
 音楽再生や操作パネルを無効にするには `meson setup build -Dsound=disabled -Dgui=disabled` とします。
 Debian パッケージは `dpkg-buildpackage -us -uc -b` で作れます。
-
-他に質問がありました、気軽にメッセージ飛ばしてください。喜んで手伝います：
-* Twitter [@sn0w75](http://twitter.com/sn0w75)
-* E-mail <ibenrunnin@gmail.com>
 
