@@ -1,3 +1,10 @@
+mikumikupenguin (0.2.1+20261011.6) unstable; urgency=medium
+
+  * Load PMD models (bones, IK, morphs, toons, rigid bodies, joints).
+  * Fix group morph data being read into an uninitialised pointer.
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 17:20:00 +0900
+
 mikumikupenguin (0.2.1+20261011.5) unstable; urgency=medium
 
   * Play VMD light motion (-l FILE, or from the camera/motion VMD);

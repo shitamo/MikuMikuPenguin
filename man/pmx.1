@@ -1,13 +1,13 @@
 .TH PMX "1" "October 2026" "PMXViewer v0.2.1" "User Commands"
 .SH NAME
-pmx \- MikuMikuDance PMX model / VMD motion viewer (MikuMikuPenguin)
+pmx \- MikuMikuDance PMX/PMD model / VMD motion viewer (MikuMikuPenguin)
 .SH SYNOPSIS
 .B pmx
-[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] \fImodel_file.pmx motion_file.vmd\fR
+[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] {\fImodel_file.pmx\fR|\fImodel_file.pmd\fR} \fImotion_file.vmd\fR
 .SH DESCRIPTION
 .B pmx
 (PMXViewer) is a demonstration program for the MikuMikuPenguin library
-(libmmp).  It loads a PMX 2.0 model and plays a VMD motion on it, with
+(libmmp).  It loads a PMX 2.0 or PMD model and plays a VMD motion on it, with
 Bullet physics for hair, skirts and other rigid bodies.
 Camera and light motion are played, and the model visibility and IK on/off
 keys of the motion file are honoured.

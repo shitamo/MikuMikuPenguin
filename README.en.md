@@ -38,7 +38,7 @@ The contents are listed below:
 ## Requirements
 For LibMikuMikuPenguin, libglfw, libglew, libglm, and libBullet are needed.
 
-For PMXViewer, libmmp and stb_image (libstb) are needed (replaced SOIL in the 2026 update). If you want to play music along with the VMD motion, you'll need SDL2 and SDL2_mixer. (You can compile the code without music playback support)
+For PMXViewer (PMX and PMD models), libmmp and stb_image (libstb) are needed (replaced SOIL in the 2026 update). If you want to play music along with the VMD motion, you'll need SDL2 and SDL2_mixer. (You can compile the code without music playback support)
 
 ### Details about libraries (1/20/2014):
 * libglfw: At the time of writing 2.7 is needed. Versions 3.0+ are not supported.

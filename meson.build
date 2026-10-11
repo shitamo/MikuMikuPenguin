@@ -75,6 +75,7 @@ libmmp = library('mmp',
   'libmmp/glm_helper.cpp',
   'libmmp/cameracontroller.cpp',
   'libmmp/lightcontroller.cpp',
+  'libmmp/pmd.cpp',
   include_directories : mmp_inc,
   dependencies : mmp_deps,
   install : true)

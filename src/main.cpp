@@ -28,7 +28,7 @@ static bool hasSuffix(const string &str, const char *suffix)
 void printHelpInfo()
 {
 	cout<<"This is PMXViewer, a demonstration using the MikuMikuPenguin library."<<endl
-	<<"Usage: pmx [options] model_file.pmx motion_file.vmd"<<endl
+	<<"Usage: pmx [options] model_file.pmx|model_file.pmd motion_file.vmd"<<endl
 	<<"Options: "<<endl
 	<<"  -s\tPlay sound file to go with VMD motion"<<endl
 	<<"\tOnly formats compatible with your build of SDL2_mixer are accepted."<<endl
@@ -96,7 +96,7 @@ int main(int argc, char** argv)
 			else
 			{
 				string str=string(argv[count]);
-				if(hasSuffix(str, ".pmx"))
+				if(hasSuffix(str, ".pmx") || hasSuffix(str, ".pmd"))
 				{
 					model_file=str;
 				}

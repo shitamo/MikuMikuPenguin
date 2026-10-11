@@ -49,7 +49,7 @@ https://github.com/sn0w75/MikuMikuPenguin/
 
 LibMikuMikuPenguinにはlibglfw, libglew,libglm,libBulletが必要です。
 
-PMXViewerにはlibmmp、stb_image（libstb）が必要です（2026年版で SOIL から変更）。VMDと一緒に音楽を再生したい場合は、SDL2、SDL2_mixerも必要です。（なくてもコンパイル出来ます）
+PMXViewer（PMX/PMDモデル対応）にはlibmmp、stb_image（libstb）が必要です（2026年版で SOIL から変更）。VMDと一緒に音楽を再生したい場合は、SDL2、SDL2_mixerも必要です。（なくてもコンパイル出来ます）
 
 ### ライブラリの詳細（2014年1月20日）：
 

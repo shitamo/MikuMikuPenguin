@@ -1,3 +1,11 @@
+October 11, 2026 (PMD):
+-PMD models are loaded (converted to the PMX structures): BDEF2 skinning,
+ "texture*sphere" names, model toon lists (standard toons are shared),
+ IK (knee limits as in MMD), type 5/9 rotation inheritance, type 8 twist
+ axes, vertex morphs, display lists, English names, rigid bodies (bone
+ relative positions) and joints. readPMX() also accepts PMD data.
+-Fixed group morph offsets being stored as uninitialised pointers
+
 October 11, 2026 (light motion, IK on/off):
 -VMD light motion (colour and direction, linear between keys) from -l,
  the -c camera VMD or the motion VMD; L toggles it

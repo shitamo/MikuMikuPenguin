@@ -129,6 +129,60 @@ namespace ClosedMMDFormat
 
 	void printDebugInfo(PMXInfo &pmxInfo);
 
+	//Resolve bone parent pointers, break parent cycles and set the rest-pose
+	//Local matrices (shared by the PMX and PMD loaders).
+	void finalizePMXBones(PMXInfo &pmxInfo)
+	{
+		//resolve parent pointers (parents may have a larger index than the child)
+		for(int i = 0; i < pmxInfo.bone_continuing_datasets; ++i)
+		{
+			PMXBone *bone = pmxInfo.bones[i];
+			int p = bone->parentBoneIndex;
+			if(p >= 0 && p < pmxInfo.bone_continuing_datasets && p != i)
+			{
+				bone->parent = pmxInfo.bones[p];
+			}
+			else
+			{
+				if(p != -1) cerr<<"WARNING: bone "<<bone->name<<" has an invalid parent index "<<p<<endl;
+				bone->parentBoneIndex = -1;
+				bone->parent = NULL;
+			}
+	}
+	//guard against parent cycles, which would make calculateGlobalMatrix() recurse forever
+	for(int i = 0; i < pmxInfo.bone_continuing_datasets; ++i)
+	{
+		PMXBone *slow = pmxInfo.bones[i], *fast = pmxInfo.bones[i];
+		while(fast && fast->parent)
+		{
+			slow = slow->parent;
+			fast = fast->parent->parent;
+			if(slow == fast)
+			{
+				cerr<<"WARNING: bone parent cycle at "<<pmxInfo.bones[i]->name<<"; detaching it"<<endl;
+				pmxInfo.bones[i]->parent = NULL;
+				pmxInfo.bones[i]->parentBoneIndex = -1;
+				break;
+			}
+		}
+	}
+
+	// calculate and set transformation matrix from parent bone
+	for(int i = 0; i < pmxInfo.bone_continuing_datasets; ++i)
+	{
+		PMXBone *bone = pmxInfo.bones[i];
+		if(bone->parent)
+		{
+			bone->Local = glm::translate(bone->position - bone->parent->position);
+		}
+		else
+		{
+			bone->Local = glm::translate(bone->position);
+		}
+	}
+	}
+
+
 	PMXInfo &readPMX(string foldername, string filename)
 	{
 		PMXInfo *pInfo = new PMXInfo();
@@ -145,6 +199,13 @@ namespace ClosedMMDFormat
 		
 		//***Extract header info***
 		miku.read(pmxInfo.header_str, 4);
+		if(miku && memcmp(pmxInfo.header_str, "Pmd", 3)==0)
+		{
+			//a PMD model (also accepted under a .pmx name)
+			miku.close();
+			delete pInfo;
+			return readPMD(foldername, filename);
+		}
 		miku.read((char*)&pmxInfo.ver, 4);
 		
 		/*if(string(pmxInfo.header_str).find("PMX ")==-1)
@@ -552,53 +613,7 @@ namespace ClosedMMDFormat
 			pmxInfo.bones.push_back(bone);
 		}
 
-		//resolve parent pointers (parents may have a larger index than the child)
-		for(int i = 0; i < pmxInfo.bone_continuing_datasets; ++i)
-		{
-			PMXBone *bone = pmxInfo.bones[i];
-			int p = bone->parentBoneIndex;
-			if(p >= 0 && p < pmxInfo.bone_continuing_datasets && p != i)
-			{
-				bone->parent = pmxInfo.bones[p];
-			}
-			else
-			{
-				if(p != -1) cerr<<"WARNING: bone "<<bone->name<<" has an invalid parent index "<<p<<endl;
-				bone->parentBoneIndex = -1;
-				bone->parent = NULL;
-			}
-		}
-		//guard against parent cycles, which would make calculateGlobalMatrix() recurse forever
-		for(int i = 0; i < pmxInfo.bone_continuing_datasets; ++i)
-		{
-			PMXBone *slow = pmxInfo.bones[i], *fast = pmxInfo.bones[i];
-			while(fast && fast->parent)
-			{
-				slow = slow->parent;
-				fast = fast->parent->parent;
-				if(slow == fast)
-				{
-					cerr<<"WARNING: bone parent cycle at "<<pmxInfo.bones[i]->name<<"; detaching it"<<endl;
-					pmxInfo.bones[i]->parent = NULL;
-					pmxInfo.bones[i]->parentBoneIndex = -1;
-					break;
-				}
-			}
-		}
-
-		// calculate and set transformation matrix from parent bone
-		for(int i = 0; i < pmxInfo.bone_continuing_datasets; ++i)
-		{
-			PMXBone *bone = pmxInfo.bones[i];
-			if(bone->parent)
-			{
-				bone->Local = glm::translate(bone->position - bone->parent->position);
-			}
-			else
-			{
-				bone->Local = glm::translate(bone->position);
-			}
-		}
+		finalizePMXBones(pmxInfo);
 		cout<<"done."<<endl;
 			
 		//***Pull Morph Info***
@@ -626,7 +641,7 @@ namespace ClosedMMDFormat
 			
 			for(int i = 0; i < morph->morphOffsetNum; ++i)
 			{
-				PMXMorphData *data;
+				PMXMorphData *data = NULL;
 				switch (morph->type)
 				{
 					case MORPH_TYPE_VERTEX:
@@ -753,6 +768,8 @@ namespace ClosedMMDFormat
 						
 						getPMXIndex(miku, groupMorph->morphIndex, pmxInfo.morphIndexSize);
 						miku.read((char*)&groupMorph->morphRate, 4);
+						
+						data = groupMorph;
 					}
 					break;
 					
