@@ -1,3 +1,9 @@
+mikumikupenguin (0.2.1+20261011.15) unstable; urgency=medium
+
+  * README: drop the sentence about not accepting reports.
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 22:10:00 +0900
+
 mikumikupenguin (0.2.1+20261011.14) unstable; urgency=medium
 
   * Remove contact addresses and CONTRIBUTING; README states that the

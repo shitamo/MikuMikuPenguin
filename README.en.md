@@ -9,9 +9,6 @@ However, I hope that this becomes a starting point for the development of MMD on
 
 ## 2026 modernisation
 
-This modified version is published as is: bug reports, requests and patches are not accepted.
-If you want to change it, please modify it yourself under the license (GPL-3, see COPYING).
-
 This tree is based on v0.2.1 with the following changes so that it builds and runs on current Linux:
 
 * GLFW 2 -> GLFW 3, current GLM (0.9.9 / 1.x)
