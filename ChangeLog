@@ -1,3 +1,5 @@
+October 11, 2026: removed the unused logger that left an empty log.txt in the current directory
+
 October 11, 2026: version 0.2.1+GLFW3 (pmx --version, libmmp.pc, Debian)
 
 October 11, 2026 (opening files from the GUI):

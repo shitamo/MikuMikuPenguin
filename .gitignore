@@ -21,7 +21,6 @@ Makefile.in
 *.lo
 *.la
 /src/pmx
-/log.txt
 
 # Debian build artefacts
 /debian/.debhelper/

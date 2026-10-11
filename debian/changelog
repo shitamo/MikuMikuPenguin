@@ -1,3 +1,10 @@
+mikumikupenguin (0.2.1+GLFW3.1) unstable; urgency=medium
+
+  * Remove the unused logger (pmxvLogger), which only created an empty
+    log.txt in the current directory.
+
+ -- shitamo <sitamo@gmail.com>  Sun, 11 Oct 2026 22:30:00 +0900
+
 mikumikupenguin (0.2.1+GLFW3) unstable; urgency=medium
 
   * New version number 0.2.1+GLFW3 for the modernised tree (v0.2.1 with

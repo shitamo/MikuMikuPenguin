@@ -18,7 +18,6 @@
 #include "pmx.h"
 #include "vmd.h"
 #include "shader.h"
-#include "pmxvLogger.h"
 
 #include "motioncontroller.h"
 #include "bulletphysics.h"

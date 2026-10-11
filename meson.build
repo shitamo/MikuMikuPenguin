@@ -1,5 +1,5 @@
 project('mikumikupenguin', 'cpp',
-  version : '0.2.1+GLFW3',
+  version : '0.2.1+GLFW3.1',
   license : 'GPL-3.0-only',
   meson_version : '>= 0.60.0',
   default_options : [
@@ -152,7 +152,6 @@ libmmp_dep = declare_dependency(link_with : libmmp,
 # ---------------------------------------------------------------- pmx viewer
 pmx_sources = [
   'src/main.cpp',
-  'src/pmxvLogger.cpp',
   'src/viewer.cpp',
   'src/glfw_func_callbacks.cpp',
   'src/gui.cpp',

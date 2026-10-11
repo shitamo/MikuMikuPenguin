@@ -15,13 +15,6 @@
 
 
 #include <libmmp.h>
-/*#include "texthandle.h"
-#include "pmx.h"
-#include "vmd.h"
-#include "pmxvLogger.h"
-
-#include "viewer.h"*/
-#include "pmxvLogger.h"
 #include "viewer.h"
 
 #include <strings.h>
@@ -190,10 +183,8 @@ int main(int argc, char** argv)
 	catch(const std::exception &e)
 	{
 		cerr<<"ERROR: "<<e.what()<<endl;
-		delete pmxvLogger::get();
 		return 1;
 	}
 	
-	delete pmxvLogger::get();	
 	return 0;
 }
