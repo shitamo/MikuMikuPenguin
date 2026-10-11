@@ -80,6 +80,15 @@ VMDMotionController::VMDMotionController(PMXInfo &pmxInfo,VMDInfo &vmdInfo,GLuin
 		bonePos.push_back(glm::vec3(0, 0, 0));
 	}
 	
+	//Deformation order: bones deformed after physics last, then by level, then index
+	for(int i=0; i<pmxInfo.bone_continuing_datasets; ++i) boneOrder.push_back(i);
+	std::stable_sort(boneOrder.begin(), boneOrder.end(), [&](int a, int b)
+	{
+		const PMXBone *A=pmxInfo.bones[a], *B=pmxInfo.bones[b];
+		if(A->transformAfterPhysics!=B->transformAfterPhysics) return !A->transformAfterPhysics;
+		return A->transformationLevel<B->transformationLevel;
+	});
+	
 	//***INIT SHOW/IK FRAMES (model visibility and IK on/off; step keys)***
 	ikEnableKeys.resize(pmxInfo.bone_continuing_datasets);
 	{
@@ -545,8 +554,18 @@ void VMDMotionController::updateBoneAnimation()
 		}
 	}
 
-	updateIK();
-	updateInheritance();
+	//Inheritance ("付与") and IK in MMD's order: bones sorted by their
+	//deformation level (then index); each bone first takes its inherited
+	//rotation/translation, then solves its IK chain.  This matters for
+	//helper IK bones that sit under inheriting bones (e.g. 足補助IK under
+	//足D, which drives the shorts of some models): solving all IK before
+	//all inheritance left them at the rest pose.
+	std::vector<char> state(pmxInfo.bone_continuing_datasets, 0);
+	for(int b : boneOrder)
+	{
+		applyInheritance(b, state);
+		solveIKBone(b);
+	}
 }
 
 //Raise a rotation to a (possibly negative or fractional) power:
@@ -651,6 +670,12 @@ bool VMDMotionController::isIKEnabled(int boneIndex) const
 
 void VMDMotionController::updateIK()
 {
+	for(int b : boneOrder) solveIKBone(b);
+}
+
+//Solve the IK chain of bone b (if it is an enabled IK bone)
+void VMDMotionController::solveIKBone(int b)
+{
 	glm::vec4 effectorPos;
 	glm::vec4 targetPos;
 	
@@ -667,7 +692,6 @@ void VMDMotionController::updateIK()
 	glm::vec3 axis;
 	glm::mat4 rotation;
 
-	for(int b=0; b<pmxInfo.bone_continuing_datasets; ++b)
 	{
 		PMXBone *IKBone=pmxInfo.bones[b];
 
@@ -747,7 +771,7 @@ void VMDMotionController::updateIK()
 	}
 
 	// dump rotation of IK link bone from parent
-	if (IK_DUMP)
+	if (IK_DUMP && b==boneOrder.back())
 	{
 		for(int b=0; b<pmxInfo.bone_continuing_datasets; ++b)
 		{

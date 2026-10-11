@@ -1,3 +1,9 @@
+October 11, 2026 (deformation order):
+-Inheritance and IK are evaluated bone by bone in MMD's deformation order
+ (after-physics flag, level, index) instead of all IK followed by all
+ inheritance. Helper IK bones under inheriting bones (Sour式 Len's
+ 足補助IK under 足D, which drives the shorts) now follow the legs
+
 October 11, 2026 (multiple models):
 -Several models can be played together: "pmx a.pmx a.vmd b.pmx b.vmd ..."
  (each VMD belongs to the model before it; a model may have no motion).

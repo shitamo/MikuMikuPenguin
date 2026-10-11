@@ -130,6 +130,8 @@ class VMDMotionController
 	glm::vec3 animatedPosition(int boneIndex) const;
 	glm::quat animatedRotation(int boneIndex) const;
 	void applyInheritance(int boneIndex, std::vector<char> &state);
+	void solveIKBone(int boneIndex);
+	std::vector<int> boneOrder; //bones in deformation order (level, index)
 	void solveIK(ClosedMMDFormat::PMXBone *joint, int effector, glm::vec3 targetPos, int numIteration, int numBones, int numMaxBones);
 	
 	
