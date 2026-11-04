@@ -1,5 +1,5 @@
 project('mikumikupenguin', 'cpp',
-  version : '0.2.1+GLFW3.4',
+  version : '0.2.1+GLFW3.5',
   license : 'GPL-3.0-only',
   meson_version : '>= 0.60.0',
   default_options : [
@@ -158,6 +158,8 @@ pmx_sources = [
   'src/viewer.cpp',
   'src/glfw_func_callbacks.cpp',
   'src/gui.cpp',
+  'src/record.cpp',
+  'src/videowriter.cpp',
 ]
 if sound_backend != 'none'
   pmx_sources += 'src/sound.cpp'

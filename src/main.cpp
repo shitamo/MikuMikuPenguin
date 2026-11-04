@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <vector>
+#include <cstdlib>
 
 
 #include <libmmp.h>
@@ -32,6 +33,7 @@ void printHelpInfo()
 {
 	cout<<"This is PMXViewer, a demonstration using the MikuMikuPenguin library."<<endl
 	<<"Usage: pmx [options] [model.pmx|model.pmd [motion.vmd] [model2.pmx motion2.vmd ...]]"<<endl
+	<<"       pmx --render out.mp4|out.png [--range A:B] [--size WxH] [--fps 30|60] [options] model [motion.vmd] ..."<<endl
 	<<"Without files the viewer starts empty: use File in the window or drop files onto it."<<endl
 	<<"Several models can be played together; each VMD belongs to the model before it."<<endl
 	<<"Options: "<<endl
@@ -43,10 +45,21 @@ void printHelpInfo()
 	<<"  --pos X,Y,Z\tPosition (MMD coordinates) of the model given just before"<<endl
 	<<"  --loop\tRestart from the beginning at the end of the motion"<<endl
 	<<"  --no-gui\tStart with the on-screen controls hidden (Tab shows them)"<<endl
-	<<"  --size WxH\tWindow size (default 1280x720)"<<endl
+	<<"  --size WxH\tWindow size, or the video size with --render (default 1280x720)"<<endl
 	<<"  --snapshot FRAME OUT.png"<<endl
 	<<"\t\tPlay to VMD frame FRAME (with physics), save that frame as a PNG"<<endl
-	<<"\t\tand exit, without showing the window or the controls (for tests)"<<endl
+	<<"\t\tand exit, without showing the window or the controls (for tests)"<<endl<<endl
+	<<"Video output (like MMD's AVI output; no window is shown, the program quits when done):"<<endl
+	<<"  --render FILE\tWrite the motion to FILE frame by frame and exit."<<endl
+	<<"\t\tFILE.png (or FILE_%04d.png, or a directory/) writes numbered PNG files;"<<endl
+	<<"\t\tFILE.mp4, .webm, .mkv, .mov, .avi, .gif ... are encoded by ffmpeg"<<endl
+	<<"\t\t(the -s music is included, starting at the first frame of the range)."<<endl
+	<<"  --range A:B\tVMD frames A to B, both included (default: 0 to the last key;"<<endl
+	<<"\t\t\"A:\" or \":B\" keep the other end)"<<endl
+	<<"  --fps 30|60\tFrame rate of the video (default 30)"<<endl
+	<<"  --no-music\tDo not put the -s music into the video"<<endl
+	<<"\tAn X display is still needed (e.g. run it under xvfb-run on a server)."<<endl
+	<<"\tThe same is available in the window from File > Export video."<<endl<<endl
 	<<"  --help\tdisplay this help and exit"<<endl
 	<<"  --version\toutput version information and exit"<<endl<<endl
 	<<"Controls:"<<endl
@@ -86,6 +99,9 @@ int main(int argc, char** argv)
 	ViewerOptions options;
 	int snapshotFrame=-1;
 	string snapshotPath;
+	bool render=false;
+	RecordSettings record;
+	bool recordOptions=false; //--range/--size/--fps without --render
 	
 	int count=0;
 	if(argc > 1)
@@ -113,11 +129,13 @@ int main(int argc, char** argv)
 			else if(string(argv[count]) == "--size")
 			{
 				int w=0, h=0;
-				if(count+1<argc && sscanf(argv[count+1], "%dx%d", &w, &h)==2 && w>0 && h>0)
+				if(count+1<argc && sscanf(argv[count+1], "%dx%d", &w, &h)==2 && w>=16 && h>=16 && w<=16384 && h<=16384)
 				{
 					++count;
-					options.width=w;
+					options.width=w;   //window size
 					options.height=h;
+					record.width=w;    //video size with --render
+					record.height=h;
 				}
 				else
 				{
@@ -161,6 +179,39 @@ int main(int argc, char** argv)
 					cerr<<"--pos needs X,Y,Z"<<endl;
 				}
 			}
+			else if(string(argv[count]) == "--render")
+			{
+				if(count+1>=argc) { cerr<<"--render needs an output file"<<endl; return 2; }
+				render=true;
+				record.output=argv[++count];
+			}
+			else if(string(argv[count]) == "--range")
+			{
+				recordOptions=true;
+				string r=count+1<argc ? argv[++count] : "";
+				size_t colon=r.find(':');
+				int a=0, b=-1;
+				char extra;
+				bool ok=colon!=string::npos;
+				if(ok && colon>0) ok=sscanf(r.substr(0, colon).c_str(), "%d%c", &a, &extra)==1 && a>=0;
+				if(ok && colon+1<r.size()) ok=sscanf(r.substr(colon+1).c_str(), "%d%c", &b, &extra)==1 && b>=0;
+				if(!ok) { cerr<<"--range needs START:END (VMD frames, e.g. 0:300)"<<endl; return 2; }
+				if(b>=0 && b<a) { cerr<<"--range: the end ("<<b<<") is before the start ("<<a<<")"<<endl; return 2; }
+				record.startFrame=a;
+				record.endFrame=b;
+			}
+			else if(string(argv[count]) == "--fps")
+			{
+				recordOptions=true;
+				string f=count+1<argc ? argv[++count] : "";
+				if(f!="30" && f!="60") { cerr<<"--fps must be 30 or 60"<<endl; return 2; }
+				record.fps=atoi(f.c_str());
+			}
+			else if(string(argv[count]) == "--no-music")
+			{
+				recordOptions=true;
+				record.withMusic=false;
+			}
 			else if(string(argv[count]) == "-c")
 			{
 				if(count+1<argc) camera_file=argv[++count];
@@ -195,6 +246,12 @@ int main(int argc, char** argv)
 	//without arguments the viewer starts empty; files are opened from the
 	//GUI or dropped onto the window
 	
+	if(render && models.empty())
+	{
+		cerr<<"--render needs a model (pmx [options] --render out.mp4 model.pmx motion.vmd)"<<endl;
+		return 2;
+	}
+	if(recordOptions && !render) cerr<<"Note: --range, --fps and --no-music are only used with --render"<<endl;
 	if(models.empty())
 	{
 		cout<<"No model given: open files from the GUI (File) or drop them onto the window."<<endl;
@@ -217,11 +274,17 @@ int main(int argc, char** argv)
 			Viewer viewer(models,"",camera_file,light_file,options);
 			return viewer.snapshot(snapshotFrame, snapshotPath) ? 0 : 1;
 		}
+		if(render)
+		{
+			options.hidden=true;
+			options.offscreen=true;
+		}
 		Viewer viewer(models,music_file,camera_file,light_file,options);
 		
 		viewer.setLoop(loop);
 		viewer.setGUI(gui);
-		viewer.run();
+		if(render) viewer.setRender(record);
+		return viewer.run();
 	}
 	catch(const std::exception &e)
 	{

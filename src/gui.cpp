@@ -11,6 +11,7 @@
 #include "motioncontroller.h"
 #include "glfw_func_callbacks.h"
 #include "sound.h"
+#include "videowriter.h"
 
 #include <iostream>
 #include <string>
@@ -204,6 +205,38 @@ namespace
 	const vector<string> vmdExts={"vmd"};
 	const vector<string> musicExts={"wav", "ogg", "mp3", "flac", "opus", "mid", "midi", "mod", "xm", "it", "s3m", "aif", "aiff", "voc", "wv"};
 	
+	//***Video output dialog
+	struct ExportDialog
+	{
+		bool requestOpen=false;
+		int start=0, end=0;
+		int size[2]={1280, 720};
+		int fps=30;
+		bool music=true;
+		char path[PATH_MAX]={0};
+	};
+	ExportDialog ed;
+	
+	string pathExtension(const string &p)
+	{
+		size_t slash=p.find_last_of('/'), dot=p.find_last_of('.');
+		if(dot==string::npos || (slash!=string::npos && dot<slash)) return "";
+		string e=p.substr(dot+1);
+		for(char &c : e) c=(char)tolower((unsigned char)c);
+		return e;
+	}
+	
+	//replace (or add) the extension of the output file
+	void setExtension(char *buf, size_t size, const char *ext)
+	{
+		string p=buf;
+		if(!p.empty() && p.back()=='/') p+="frame";
+		size_t slash=p.find_last_of('/'), dot=p.find_last_of('.');
+		if(dot!=string::npos && (slash==string::npos || dot>slash)) p=p.substr(0, dot);
+		p+=string(".")+ext;
+		snprintf(buf, size, "%s", p.c_str());
+	}
+	
 	string timeText(int frame)
 	{
 		char buf[32];
@@ -380,6 +413,19 @@ void Viewer::guiFrame()
 					pendingLoads.push_back(PendingLoad{PendingLoad::Light, "", -1});
 				if(ImGui::MenuItem(T("Stop music", "音楽を外す"), NULL, false, !musicPathShown.empty()))
 					pendingLoads.push_back(PendingLoad{PendingLoad::Music, "", -1});
+				ImGui::Separator();
+				if(ImGui::MenuItem(T("Export video...", "動画出力…"), NULL, false, !models.empty()))
+				{
+					ed.requestOpen=true;
+					setPaused(true); //"From here" uses the current position
+					ed.start=0;
+					ed.end=endFrame;
+					if(!ed.path[0])
+					{
+						string dir=lastDir.empty() ? currentDir() : lastDir;
+						snprintf(ed.path, sizeof(ed.path), "%s", joinPath(dir, VideoWriter::ffmpegAvailable() ? "pmx_video.mp4" : "pmx_video.png").c_str());
+					}
+				}
 				ImGui::Separator();
 				ImGui::TextDisabled("%s", T("Files can also be dropped onto the window", "ファイルはウィンドウへのドロップでも読み込めます"));
 				ImGui::EndPopup();
@@ -638,6 +684,213 @@ void Viewer::guiFrame()
 	else
 	{
 		fb.open=false;
+	}
+	
+	//***Video output: settings***
+	if(ed.requestOpen)
+	{
+		ImGui::OpenPopup("###exportvideo");
+		ed.requestOpen=false;
+	}
+	ImGui::SetNextWindowPos(centre, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+	if(ImGui::BeginPopupModal(T("Export video###exportvideo", "動画出力###exportvideo"), NULL, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoSavedSettings))
+	{
+		int endFrame=std::max(endTime/2, 0);
+		float numW=ImGui::CalcTextSize("000000").x+ImGui::GetFrameHeight()*2.0f+ImGui::GetStyle().ItemInnerSpacing.x*2.0f;
+		
+		//range (VMD frames, both included)
+		ImGui::AlignTextToFramePadding();
+		ImGui::TextUnformatted(T("Range (frames)", "範囲（フレーム）"));
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(numW);
+		ImGui::InputInt("##start", &ed.start);
+		ImGui::SameLine();
+		ImGui::TextUnformatted("-");
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(numW);
+		ImGui::InputInt("##end", &ed.end);
+		ImGui::SameLine();
+		if(ImGui::SmallButton(T("All", "全体"))) { ed.start=0; ed.end=endFrame; }
+		ImGui::SameLine();
+		if(ImGui::SmallButton(T("From here", "現在位置から"))) ed.start=std::min(currentTime(), std::max(endTime, 0))/2;
+		ed.start=std::max(ed.start, 0);
+		ed.end=std::max(ed.end, 0);
+		
+		//size
+		ImGui::AlignTextToFramePadding();
+		ImGui::TextUnformatted(T("Size", "サイズ"));
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(numW*2.0f);
+		ImGui::InputInt2("##size", ed.size);
+		ImGui::SameLine();
+		static const int presets[][2]={{640,360},{1280,720},{1920,1080},{2560,1440},{3840,2160}};
+		if(ImGui::SmallButton(T("Presets", "プリセット"))) ImGui::OpenPopup("sizepresets");
+		if(ImGui::BeginPopup("sizepresets"))
+		{
+			for(const auto &p : presets)
+			{
+				string label=std::to_string(p[0])+" x "+std::to_string(p[1]);
+				if(ImGui::MenuItem(label.c_str())) { ed.size[0]=p[0]; ed.size[1]=p[1]; }
+			}
+			int ww=0, wh=0;
+			glfwGetFramebufferSize(window, &ww, &wh);
+			string label=string(T("Window", "ウィンドウと同じ"))+" ("+std::to_string(ww)+" x "+std::to_string(wh)+")";
+			if(ImGui::MenuItem(label.c_str())) { ed.size[0]=ww; ed.size[1]=wh; }
+			ImGui::EndPopup();
+		}
+		ed.size[0]=std::min(std::max(ed.size[0], 16), 16384);
+		ed.size[1]=std::min(std::max(ed.size[1], 16), 16384);
+		
+		ImGui::AlignTextToFramePadding();
+		ImGui::TextUnformatted(T("Frame rate", "フレームレート"));
+		ImGui::SameLine();
+		ImGui::RadioButton("30 fps", &ed.fps, 30);
+		ImGui::SameLine();
+		ImGui::RadioButton("60 fps", &ed.fps, 60);
+		
+		//output: the extension decides the format
+		ImGui::AlignTextToFramePadding();
+		ImGui::TextUnformatted(T("Output", "出力先"));
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(std::max(ImGui::CalcTextSize("0").x*48.0f, 300.0f));
+		ImGui::InputText("##output", ed.path, sizeof(ed.path));
+		bool ffmpeg=VideoWriter::ffmpegAvailable();
+		ImGui::AlignTextToFramePadding();
+		ImGui::TextUnformatted(T("Format", "形式"));
+		ImGui::SameLine();
+		string ext=pathExtension(ed.path);
+		bool sequence=VideoWriter::isImageSequence(ed.path);
+		ImGui::BeginDisabled(!ffmpeg);
+		if(ImGui::RadioButton("MP4 (H.264)", ext=="mp4")) setExtension(ed.path, sizeof(ed.path), "mp4");
+		ImGui::SameLine();
+		if(ImGui::RadioButton("WebM (VP9)", ext=="webm")) setExtension(ed.path, sizeof(ed.path), "webm");
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		if(ImGui::RadioButton(T("PNG sequence", "PNG 連番"), sequence)) setExtension(ed.path, sizeof(ed.path), "png");
+		
+		sequence=VideoWriter::isImageSequence(ed.path);
+		if(sequence)
+		{
+			ImGui::TextDisabled(T("Files: %s, %s, ...", "ファイル: %s, %s, …"),
+			                    baseName(VideoWriter::sequenceFileName(ed.path, 0)).c_str(), baseName(VideoWriter::sequenceFileName(ed.path, 1)).c_str());
+		}
+		else if(!ffmpeg)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.4f, 1.0f), "%s", T("ffmpeg is not installed: only PNG files can be written", "ffmpeg が見つかりません（PNG 連番のみ出力できます）"));
+		}
+		else
+		{
+			ImGui::TextDisabled("%s", T("Encoded by ffmpeg (mp4, webm, mkv, mov, avi, gif ...)", "ffmpeg で変換します（mp4, webm, mkv, mov, avi, gif など）"));
+		}
+		if(!musicPathShown.empty())
+		{
+			ImGui::BeginDisabled(sequence);
+			ImGui::Checkbox(T("Include the music", "音楽を入れる"), &ed.music);
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			ImGui::TextDisabled("%s", baseName(musicPathShown).c_str());
+		}
+		
+		bool valid=ed.end>=ed.start && ed.path[0] && (sequence || ffmpeg);
+		if(valid)
+		{
+			int frames=(ed.end-ed.start+1)*(ed.fps/30);
+			ImGui::Text(T("%d frames, %.2f s", "%d コマ、%.2f 秒"), frames, (ed.end-ed.start+1)/30.0);
+		}
+		else if(ed.end<ed.start)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.4f, 1.0f), "%s", T("The range ends before it starts", "範囲の終わりが始まりより前です"));
+		}
+		else ImGui::TextUnformatted("");
+		
+		ImGui::Separator();
+		ImGui::BeginDisabled(!valid);
+		bool start=ImGui::Button(T("Start", "開始"));
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		bool cancel=ImGui::Button(T("Cancel", "キャンセル")) || ImGui::IsKeyPressed(ImGuiKey_Escape);
+		if(start)
+		{
+			recordRequest=RecordSettings();
+			recordRequest.output=ed.path;
+			recordRequest.startFrame=ed.start;
+			recordRequest.endFrame=ed.end;
+			recordRequest.width=ed.size[0];
+			recordRequest.height=ed.size[1];
+			recordRequest.fps=ed.fps;
+			recordRequest.withMusic=ed.music;
+			recordRequested=true;
+			cancel=true;
+		}
+		if(cancel) ImGui::CloseCurrentPopup();
+		ImGui::EndPopup();
+	}
+	
+	//***Video output: progress***
+	//the frame being written stays visible behind the progress dialog
+	{
+		static float dimAlpha=-1.0f;
+		ImVec4 &dim=ImGui::GetStyle().Colors[ImGuiCol_ModalWindowDimBg];
+		if(dimAlpha<0.0f) dimAlpha=dim.w;
+		dim.w=recording ? 0.0f : dimAlpha;
+	}
+	if(recording && !ImGui::IsPopupOpen("###recording")) ImGui::OpenPopup("###recording");
+	ImGui::SetNextWindowPos(ImVec2(centre.x, vpm->WorkPos.y+vpm->WorkSize.y-10.0f), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+	if(ImGui::BeginPopupModal(T("Exporting video###recording", "動画出力中###recording"), NULL, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoMove))
+	{
+		if(!recording)
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		else
+		{
+			string name=baseName(rec.output);
+			ImGui::TextUnformatted(name.empty() ? rec.output.c_str() : name.c_str());
+			if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", rec.output.c_str());
+			char overlay[64];
+			float fraction;
+			double elapsed=glfwGetTime()-recStartWall;
+			if(recordPreroll)
+			{
+				int done=currentTime()/2;
+				fraction=rec.startFrame>0 ? done/(float)rec.startFrame : 0.0f;
+				snprintf(overlay, sizeof(overlay), "%d / %d", done, rec.startFrame);
+				ImGui::Text("%s", T("Running the physics up to the first frame...", "最初のフレームまで物理演算を進めています…"));
+			}
+			else
+			{
+				fraction=recTotal>0 ? recFrame/(float)recTotal : 0.0f;
+				snprintf(overlay, sizeof(overlay), "%d / %d", recFrame, recTotal);
+				if(recFrame>0)
+				{
+					double remaining=elapsed/recFrame*(recTotal-recFrame);
+					ImGui::Text(T("Frame %d (%d x %d, %d fps)   elapsed %d s, about %d s left", "フレーム %d（%d x %d、%d fps）  経過 %d 秒、残り約 %d 秒"),
+					            rec.startFrame+recFrame*recStep/2, rec.width, rec.height, rec.fps, (int)elapsed, (int)(remaining+0.5));
+				}
+				else ImGui::Text(T("Frame %d (%d x %d, %d fps)", "フレーム %d（%d x %d、%d fps）"), rec.startFrame, rec.width, rec.height, rec.fps);
+			}
+			ImGui::ProgressBar(fraction, ImVec2(std::max(ImGui::CalcTextSize("0").x*50.0f, 360.0f), 0.0f), overlay);
+			if(ImGui::Button(T("Stop", "中止")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) recordCancel=true;
+			if(recordCancel) { ImGui::SameLine(); ImGui::TextDisabled("%s", T("stopping...", "中止しています…")); }
+		}
+		ImGui::EndPopup();
+	}
+	
+	//***Video output: result***
+	if(!recordMessage.empty() && !recording && !ImGui::IsPopupOpen("###recorddone")) ImGui::OpenPopup("###recorddone");
+	ImGui::SetNextWindowPos(centre, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+	if(ImGui::BeginPopupModal(T("Export video###recorddone", "動画出力###recorddone"), NULL, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoSavedSettings))
+	{
+		if(recordFailed) ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.4f, 1.0f), "%s", T("Failed", "失敗しました"));
+		else if(recordCancelled) ImGui::TextUnformatted(T("Stopped", "中止しました"));
+		else ImGui::TextUnformatted(T("Done", "完了しました"));
+		ImGui::TextUnformatted(recordMessage.c_str());
+		if(ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_Escape))
+		{
+			recordMessage.clear();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
 	}
 	
 	//***Loading / errors***

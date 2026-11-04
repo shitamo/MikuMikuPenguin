@@ -54,6 +54,19 @@ struct PendingLoad
 	int model; //!< target model (Motion, Remove; Auto: -1 = choose)
 };
 
+//! Video output ("AVI output"): range, size, frame rate and destination
+struct RecordSettings
+{
+	std::string output;   //!< *.png / directory: PNG sequence, otherwise a video file (ffmpeg)
+	int startFrame=0;     //!< first VMD frame (30 fps)
+	int endFrame=-1;      //!< last VMD frame, inclusive (-1: the end of the motion)
+	int width=1280, height=720;
+	int fps=30;           //!< 30 or 60
+	bool withMusic=true;  //!< mux the music (-s / File > Music) into a video
+};
+
+class VideoWriter;
+
 //! One model of the scene with its own motion, physics world and GL buffers
 struct SceneModel
 {
@@ -77,7 +90,8 @@ struct ViewerOptions
 	int width, height; //!< window size
 	bool hidden;       //!< do not show the window (snapshots)
 	bool multisample;  //!< 4x MSAA (off for snapshots, which must be reproducible)
-	ViewerOptions(): width(1280), height(720), hidden(false), multisample(true) {}
+	bool offscreen;    //!< --render: no GUI and no sound playback (frames go to an FBO)
+	ViewerOptions(): width(1280), height(720), hidden(false), multisample(true), offscreen(false) {}
 };
 
 class Viewer
@@ -87,7 +101,9 @@ class Viewer
 	       const ViewerOptions &options=ViewerOptions());
 	~Viewer();
 	
-	void run();
+	int run(); //!< returns the exit status (non-zero when --render failed)
+	//! run() writes this video and returns instead of showing the window
+	void setRender(const RecordSettings &s) { batchRecord=true; batchSettings=s; }
 	/*! Play from the beginning to VMD frame `frame` (30 fps, with physics,
 	 *  in the same 1/60 s steps as run()), draw that one frame without the
 	 *  GUI and save it as a PNG.  Returns false if the file cannot be written. */
@@ -98,6 +114,7 @@ class Viewer
 	
 	private:
 	ViewerOptions options;
+	bool offscreen; //!< options.offscreen: no GUI and no sound playback (--render)
 	void initGLFW();
 	void hackShaderFiles(); //modify #version lines in shader files to match GL version
 	void bindAttribLocations(); //before linking the shader program
@@ -171,6 +188,33 @@ class Viewer
 	void guiRender();  //!< draw the GUI on top of the scene
 	void shutdownGUI();
 	void updateCameraUniforms();
+	
+	//***Video output (render to an FBO frame by frame, in exact 1/60 s steps)
+	bool batchRecord;          //!< --render: write the video, then quit
+	RecordSettings batchSettings;
+	bool recording;            //!< a video is being written
+	bool recordPreroll;        //!< running the physics up to the first frame
+	bool recordRequested;      //!< GUI: start recording with recordRequest
+	bool recordCancel;         //!< GUI: stop at the next frame
+	bool recordFailed;
+	bool recordCancelled;      //!< the last video was stopped by the user
+	RecordSettings recordRequest, rec;
+	std::string recordMessage; //!< result shown by the GUI
+	VideoWriter *writer;
+	int recFrame, recTotal, recStep; //!< frames written, frames in total, 1/60 s steps per frame
+	double recStartWall;
+	int recSavedTime; bool recSavedPaused;
+	GLuint recFBO, recColorRB, recDepthRB, recResolveFBO, recResolveRB;
+	GLuint drawFBO;            //!< framebuffer the scene is drawn into (0: the window)
+	std::vector<unsigned char> recPixels;
+	bool startRecording(const RecordSettings &s, std::string &error);
+	bool recordNextFrame();    //!< false after an error (recording has stopped)
+	void finishRecording(bool cancelled, const std::string &error="");
+	void renderRecordFrame();  //!< draw the scene into the FBO and read it back
+	void drawRecordPreview();  //!< the last frame, scaled into the window
+	bool createRecordTargets(int w, int h, std::string &error);
+	void destroyRecordTargets();
+	int runBatchRecord();
 	
 	void drawModel(SceneModel &m, bool drawEdges);
 	
