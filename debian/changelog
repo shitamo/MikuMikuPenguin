@@ -1,3 +1,18 @@
+mikumikupenguin (0.2.1+GLFW3.3) unstable; urgency=medium
+
+  * Harden the PMX, PMD and VMD loaders against broken and hostile files
+    (found by fuzzing): counts and text lengths are checked against the
+    file size before allocating, out-of-range bone, texture, vertex,
+    material, morph and rigid body indices are repaired or dropped at load
+    time, bool fields are read as bytes, and unknown rigid body shapes are
+    rejected.  Fixes heap overflows, undefined behaviour, multi-gigabyte
+    allocations and hangs (IK loop count, deep bone chains).
+  * Free the loaded model and the motion controller's vertex data, and
+    Bullet joints, instead of leaking them.
+  * libFuzzer targets (meson -Dfuzz=true) and loader regression tests.
+
+ -- shitamo <sitamo@gmail.com>  Wed, 04 Nov 2026 23:50:00 +0900
+
 mikumikupenguin (0.2.1+GLFW3.2) unstable; urgency=medium
 
   * Repeat model textures like MMD (fixes wrong colours of models whose

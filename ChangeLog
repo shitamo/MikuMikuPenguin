@@ -1,3 +1,27 @@
+November 4, 2026 (robust loaders, version 0.2.1+GLFW3.3):
+-The PMX, PMD and VMD loaders no longer crash, hang or allocate huge
+ amounts of memory on broken or hostile files (found with libFuzzer):
+ counts and text lengths are checked against the rest of the file before
+ anything is allocated; every bone / texture / vertex / material / morph /
+ rigid body index is checked when the model is loaded (invalid optional
+ references become "none", joints without their rigid body and morph
+ offsets of missing vertices are dropped, face ranges of materials are
+ clamped to the index buffer); bool fields are read as bytes; unknown
+ rigid body shapes and truncated VMD keys are load errors; the IK loop
+ count is capped at 255 like MMD; rigid body groups are 0-15
+-Bone global matrices are computed without recursion and in one pass per
+ frame (a 65535-bone chain overflowed the stack), and the bone parent
+ cycle check is linear
+-PMXInfo frees what it owns (and a model that fails to load is freed); the
+ motion controller frees its vertex data; Bullet joints are freed
+-PMX index counts that are not a multiple of 3 no longer shift the rest of
+ the file; face_continuing_datasets is the number of faces for PMX too
+-VMD: the header is checked; version 1 files ("Vocaloid Motion Data
+ file", 10-byte model name) are read
+-libFuzzer targets for the three formats (meson -Dfuzz=true, test/fuzz),
+ generated seed files, and regression tests with small reproducers
+ (test/regress, run by meson test)
+
 October 11, 2026 (texture wrap):
 -Model textures repeat (Direct3D's default WRAP sampler) instead of
  clamping: models with UVs outside [0,1] (e.g. converted from VRM, such as
