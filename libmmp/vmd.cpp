@@ -7,6 +7,9 @@
 #include <sstream>
 
 #include "texthandle.h"
+#include "binreader.h"
+
+#include <memory>
 
 #include <string.h>
 #include <cstdint>
@@ -17,65 +20,60 @@ using namespace std;
 namespace ClosedMMDFormat
 {
 
+	namespace
+	{
+		//Number of records of a section.  Files may end before any section
+		//(older MMD versions write fewer sections), which means "none"; a
+		//count that the rest of the file cannot hold is an error.
+		uint32_t sectionCount(BinaryReader &r, size_t recordSize, const char *name)
+		{
+			if(r.remaining()<4) { r.skip(r.remaining()); return 0; }
+			return r.checkCount(r.u32(), recordSize, name);
+		}
+
+		string fixedText(BinaryReader &r, size_t n)
+		{
+			char buf[32]={0};
+			r.raw(buf, n);
+			return sjisToUTF8(buf, n);
+		}
+	}
+
 	VMDInfo &readVMD(string filename)
 	{
-		VMDInfo *vInfo = new VMDInfo();
+		std::vector<char> data=readWholeFile(filename, "VMD");
+		BinaryReader r(data, BinaryReader::Mode::Throw, "VMD file", filename);
+		std::unique_ptr<VMDInfo> vInfo(new VMDInfo());
 		VMDInfo &vmdInfo = *vInfo;
-		
-		ifstream miku(filename.c_str(), ios::in | ios::binary);
-		if (!miku) { { std::ostringstream es_; es_<<"ERROR: VMD file could not be found: "<<filename; cerr<<es_.str()<<endl; throw std::runtime_error(es_.str()); } }
 		
 		//***Extract Header Info***
 		char headerStr[30] = {0};
-		miku.read((char*)&headerStr, 30);
-		
-		char modelName[20];
-		miku.read((char*)&modelName, 20);
-		vmdInfo.modelName=sjisToUTF8(modelName, sizeof(modelName));
+		r.raw(headerStr, 30);
+		if(memcmp(headerStr, "Vocaloid Motion Data", 20)!=0) r.fail("not a VMD file");
+		//version 1 ("Vocaloid Motion Data file") has a 10-byte model name
+		bool version1=memcmp(headerStr, "Vocaloid Motion Data file", 25)==0;
+		vmdInfo.modelName=fixedText(r, version1 ? 10 : 20);
 		
 		cout<<std::string(headerStr, strnlen(headerStr, sizeof(headerStr)))<<endl;
-		//cout<<vmdInfo.modelName<<endl;
 		
 		//***Extract Bone Info***
-		unsigned boneCount=0;
-		miku.read((char*)&boneCount, 4);
-		if(!miku) boneCount=0; //older/truncated VMD files may end early
-		if(boneCount>10000000)
-		{
-			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (boneCount="<<boneCount<<")"; cerr<<es_.str()<<endl;
-			throw std::runtime_error(es_.str()); }
-		}
-		vmdInfo.boneFrames.resize(boneCount);
-		
-		//cout<<"Bone Count: "<<boneCount<<endl;
-		
+		vmdInfo.boneFrames.resize(sectionCount(r, 15+4+12+16+64, "bone frame"));
 		cout<<"Loading bone frames...";
-		for(int i=0; i < vmdInfo.boneFrames.size(); ++i)
+		for(VMDBoneFrame &frame : vmdInfo.boneFrames)
 		{
-			VMDBoneFrame *f = &vmdInfo.boneFrames[i];
+			VMDBoneFrame *f = &frame;
+			f->name=fixedText(r, 15);
+			f->frame=r.u32();
 			
-			char name[15];
-			miku.read((char*)name, 15);
-			f->name=sjisToUTF8(name, sizeof(name));
-			
-			miku.read((char*)&f->frame, 4);
-			
-			miku.read((char*)&f->translation.x, 4);
-			miku.read((char*)&f->translation.y, 4);
-			miku.read((char*)&f->translation.z, 4);
-			//f->translation.x=-f->translation.x;
+			f->translation.x=r.f32();
+			f->translation.y=r.f32();
+			f->translation.z=r.f32();
 			f->translation.z = -f->translation.z;
 			
-			//cout<<f->position.x<<" "<<f->position.y<<" "<<f->position.z<<endl;
-			
-			miku.read((char*)&f->rotation.x, 4);
-			miku.read((char*)&f->rotation.y, 4);
-			miku.read((char*)&f->rotation.z, 4);
-			miku.read((char*)&f->rotation.w, 4);
-			//f->rotation.x=-f->rotation.x;
-			//f->rotation.y=-f->rotation.y;
-			//f->rotation.z=-f->rotation.z;
-			//f->rotation.w=-f->rotation.w;
+			f->rotation.x=r.f32();
+			f->rotation.y=r.f32();
+			f->rotation.z=r.f32();
+			f->rotation.w=r.f32();
 			glm::mat3 rotMatrix=glm::toMat3(f->rotation);
 			rotMatrix[2][0] = -rotMatrix[2][0];
 			rotMatrix[2][1] = -rotMatrix[2][1];
@@ -84,7 +82,7 @@ namespace ClosedMMDFormat
 			f->rotation=glm::toQuat(rotMatrix);
 			
 			uint8_t bezier[64];
-			miku.read((char*)bezier,64);
+			r.raw(bezier, 64);
 			
 			//Cubic bezier variables
 			//line 1
@@ -108,195 +106,95 @@ namespace ClosedMMDFormat
 			f->bezier.Y2.y = bezier[13];
 			f->bezier.Z2.y = bezier[14];
 			f->bezier.R2.y = bezier[15];
-			
-			//cout<<f->bezier.Y1.x<<" "<<(int)bezier[1]<<" "<<(int)bezier[16]<<endl;
-			//exit(EXIT_FAILURE);
-			
-			/*cout<<f->bezier.X1.x<<" "<<f->bezier.X1.y<<" "<<f->bezier.Y1.x<<" "<<f->bezier.Y1.y<<" "<<f->bezier.Z1.x<<" "<<f->bezier.Z1.y<<" "<<f->bezier.R1.x<<" "<<f->bezier.R1.y<<endl
-			<<f->bezier.X2.x<<" "<<f->bezier.X2.y<<" "<<f->bezier.Y2.x<<" "<<f->bezier.Y2.y<<" "<<f->bezier.Z2.x<<" "<<f->bezier.Z2.y<<" "<<f->bezier.R2.x<<" "<<f->bezier.R2.y<<endl<<endl;*/
-			
-			
-			/*cout<<"Name: "<<f->name<<endl;
-			cout<<"Frame Number: "<<f->frame<<endl<<endl;
-			
-			cout<<"Position: "<<f->position.x<<" "<<f->position.y<<" "<<f->position.z<<endl;
-			cout<<"Quaternion: "<<f->quaternion.x<<" "<<f->quaternion.y<<" "<<f->quaternion.z<<" "<<f->quaternion.w<<endl;*/
 		}
 		cout<<"done."<<endl;
 		
 		//***Extract Morph Info***
-		unsigned morphCount=0;
-		miku.read((char*)&morphCount, 4);
-		if(!miku) morphCount=0; //older/truncated VMD files may end early
-		if(morphCount>10000000)
-		{
-			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (morphCount="<<morphCount<<")"; cerr<<es_.str()<<endl;
-			throw std::runtime_error(es_.str()); }
-		}
-		vmdInfo.morphFrames.resize(morphCount);
-		
-		//cout<<"Morph Count: "<<vmdInfo.morphCount<<endl;
-		
+		vmdInfo.morphFrames.resize(sectionCount(r, 15+4+4, "morph frame"));
 		cout<<"Loading morph frames...";
-		for(int i=0; i < vmdInfo.morphFrames.size(); ++i)
+		for(VMDMorphFrame &f : vmdInfo.morphFrames)
 		{
-			VMDMorphFrame *f = &vmdInfo.morphFrames[i];
-			
-			char name[15];
-			miku.read((char*)&name, 15);
-			f->name = sjisToUTF8(name, sizeof(name));
-			
-			miku.read((char*)&f->frame, 4);
-			miku.read((char*)&f->value, 4);
-
-			/*cout<<"Name: "<<f->name<<endl;
-			cout<<"Frame Number: "<<f->frame<<endl;
-			cout<<"Value: "<<f->value<<endl<<endl;*/
+			f.name=fixedText(r, 15);
+			f.frame=r.u32();
+			f.value=r.f32();
 		}
 		cout<<"done."<<endl;
 		
-		///NOTHING PAST THIS POINT TESTED (yet)
-		
 		//***Extract Camera Info***
-		unsigned int cameraCount=0;
-		miku.read((char*)&cameraCount, 4);
-		if(!miku) cameraCount=0; //older/truncated VMD files may end early
-		if(cameraCount>10000000)
-		{
-			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (cameraCount="<<cameraCount<<")"; cerr<<es_.str()<<endl;
-			throw std::runtime_error(es_.str()); }
-		}
-		vmdInfo.cameraFrames.resize(cameraCount);
-		//cout<<"Camera Count: "<<vmdInfo.cameraCount<<endl;
-		
+		vmdInfo.cameraFrames.resize(sectionCount(r, 61, "camera frame"));
 		cout<<"Loading camera frames...";
-		for(int i=0; i < vmdInfo.cameraFrames.size(); ++i)
+		for(VMDCameraFrame &frame : vmdInfo.cameraFrames)
 		{
-			VMDCameraFrame *f = &vmdInfo.cameraFrames[i];
-			
+			VMDCameraFrame *f = &frame;
 			//61 bytes: frame, distance, interest point, rotation (radians),
 			//24 bytes of interpolation, view angle (degrees), perspective flag
-			miku.read((char*)&f->frame, 4);
-			miku.read((char*)&f->distance, 4);
+			f->frame=r.u32();
+			f->distance=r.f32();
 			
-			miku.read((char*)&f->position.x, 4);
-			miku.read((char*)&f->position.y, 4);
-			miku.read((char*)&f->position.z, 4);
+			f->position.x=r.f32();
+			f->position.y=r.f32();
+			f->position.z=r.f32();
 			f->position.z = -f->position.z; //Direct3D -> OpenGL
 			
 			//Euler angles in radians, kept as stored in the file; see
 			//VMDCameraController for how they are applied.
-			miku.read((char*)&f->rotation.x, 4);
-			miku.read((char*)&f->rotation.y, 4);
-			miku.read((char*)&f->rotation.z, 4);
+			f->rotation.x=r.f32();
+			f->rotation.y=r.f32();
+			f->rotation.z=r.f32();
 			
-			miku.read(f->interpolationParameters, 24);
+			r.raw(f->interpolationParameters, 24);
 			
-			miku.read((char*)&f->viewAngle, 4);
-			uint8_t perspective = 0;
-			miku.read((char*)&perspective, 1);
-			f->perspective = perspective; //0: perspective ON, 1: OFF (as stored)
+			f->viewAngle=r.u32();
+			f->perspective = r.flag(); //0: perspective ON, 1: OFF (as stored)
 		}
 		cout<<"done."<<endl;	
 		
-		
 		//***Extract Light Info***
-		unsigned lightCount=0;
-		miku.read((char*)&lightCount, 4);
-		if(!miku) lightCount=0; //older/truncated VMD files may end early
-		if(lightCount>10000000)
-		{
-			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (lightCount="<<lightCount<<")"; cerr<<es_.str()<<endl;
-			throw std::runtime_error(es_.str()); }
-		}
-		vmdInfo.lightFrames.resize(lightCount);
-		//cout<<"Light Count: "<<lightCount<<endl;
-		
+		vmdInfo.lightFrames.resize(sectionCount(r, 28, "light frame"));
 		cout<<"Loading light frames...";
-		for(int i=0; i < vmdInfo.lightFrames.size(); ++i)
+		for(VMDLightFrame &f : vmdInfo.lightFrames)
 		{
-			VMDLightFrame *f = &vmdInfo.lightFrames[i];
-			
-			miku.read((char*)&f->frame, 4);
-			
-			miku.read((char*)&f->color.r, 4);
-			miku.read((char*)&f->color.g, 4);
-			miku.read((char*)&f->color.b, 4);
-
-			miku.read((char*)&f->position.x, 4);
-			miku.read((char*)&f->position.y, 4);
-			miku.read((char*)&f->position.z, 4);
-			f->position.z = -f->position.z;
+			f.frame=r.u32();
+			f.color.r=r.f32();
+			f.color.g=r.f32();
+			f.color.b=r.f32();
+			f.position.x=r.f32();
+			f.position.y=r.f32();
+			f.position.z=r.f32();
+			f.position.z = -f.position.z;
 		}
 		cout<<"done."<<endl;
 	
 		//***Extract Self Shadow Info***
-		unsigned selfShadowCount=0;
-		miku.read((char*)&selfShadowCount, 4);
-		if(!miku) selfShadowCount=0; //older/truncated VMD files may end early
-		if(selfShadowCount>10000000)
-		{
-			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (selfShadowCount="<<selfShadowCount<<")"; cerr<<es_.str()<<endl;
-			throw std::runtime_error(es_.str()); }
-		}
-		vmdInfo.selfShadowFrames.resize(selfShadowCount);
-		//cout<<"SelfShadow Count: "<<selfShadowCount<<endl;
-		
+		vmdInfo.selfShadowFrames.resize(sectionCount(r, 9, "self shadow frame"));
 		cout<<"Loading SelfShadow frames...";
-		for(int i=0; i < vmdInfo.selfShadowFrames.size(); ++i)
+		for(VMDSelfShadowFrame &f : vmdInfo.selfShadowFrames)
 		{
-
-
-
-			VMDSelfShadowFrame *f = &vmdInfo.selfShadowFrames[i];
-			
-			miku.read((char*)&f->frame,    4);
-			miku.read((char*)&f->type,     1);
-			miku.read((char*)&f->distance, 4);
+			f.frame=r.u32();
+			f.type=r.u8();
+			f.distance=r.f32();
 		}
 		cout<<"done."<<endl;
 		
 		//***Extract Show IK Frame Info***
-		unsigned showIKCount=0;
-		miku.read((char*)&showIKCount, 4);
-		if(!miku) showIKCount=0; //older/truncated VMD files may end early
-		if(showIKCount>10000000)
-		{
-			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (showIKCount="<<showIKCount<<")"; cerr<<es_.str()<<endl;
-			throw std::runtime_error(es_.str()); }
-		}
-		vmdInfo.showIKFrames.resize(showIKCount);
-		//cout<<"ShowIK Count: "<<showIKCount<<endl;
-		
+		vmdInfo.showIKFrames.resize(sectionCount(r, 9, "show/IK frame"));
 		cout<<"Loading ShowIK frames...";
-		for(int i=0; i < vmdInfo.showIKFrames.size(); ++i)
+		for(VMDShowIKFrame &f : vmdInfo.showIKFrames)
 		{
-			VMDShowIKFrame *f = &vmdInfo.showIKFrames[i];
-			
-			unsigned IKCount=0;
-			miku.read((char*)&f->frame,    4);
-			miku.read((char*)&f->show,     1);
-			miku.read((char*)&IKCount,  4);
-			if(!miku || IKCount>100000) IKCount=0;
-			f->IKList.resize(IKCount);
-			//cout<<"IK Count: "<<IKCount<<endl;
-			
-			for(int i=0; i < f->IKList.size(); ++i)
+			f.frame=r.u32();
+			f.show=r.flag();
+			f.IKList.resize(r.checkCount(r.u32(), 21, "IK state"));
+			for(VMDIKInfo &info : f.IKList)
 			{
-				VMDIKInfo *info = &f->IKList[i];
-				char name[20];
-				miku.read((char*)&name, 20);
-				info->name = sjisToUTF8(name, sizeof(name));
-				miku.read((char*)&info->isOn, 1);
+				info.name=fixedText(r, 20);
+				info.isOn=r.flag();
 			}
 		}
 		cout<<"done."<<endl;
 
 		cout<<endl;
 		
-		return vmdInfo;
-		
-		//exit(EXIT_SUCCESS);
+		return *vInfo.release();
 	}
 	
 	void writeVMD(VMDInfo &vmdInfo, string filename)

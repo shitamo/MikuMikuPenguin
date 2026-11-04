@@ -30,6 +30,8 @@
 #include <cstring>
 #include <cstdint>
 #include <algorithm>
+#include <map>
+#include <memory>
 
 #include <dirent.h>
 #include <strings.h>
@@ -162,7 +164,7 @@ namespace ClosedMMDFormat
 		file.close();
 
 		PMDReader r(data);
-		PMXInfo *pInfo=new PMXInfo();
+		std::unique_ptr<PMXInfo> pInfo(new PMXInfo()); //freed if loading fails
 		PMXInfo &info=*pInfo;
 
 		//***Header***
@@ -567,6 +569,7 @@ namespace ClosedMMDFormat
 			return (int)texturePaths.size()-1;
 		};
 
+		std::map<string, bool> toonInFolder; //folderHasFile() results (one directory scan per name)
 		for(uint32_t i=0; i<materialCount; ++i)
 		{
 			PMXMaterial *m=info.materials[i];
@@ -601,7 +604,14 @@ namespace ClosedMMDFormat
 			{
 				const string &toon=toonNames[t];
 				int shared=sharedToonIndex(toon);
-				if(shared>=0 && !folderHasFile(foldername, toon))
+				bool ownCopy=false;
+				if(shared>=0)
+				{
+					auto it=toonInFolder.find(toon);
+					if(it==toonInFolder.end()) it=toonInFolder.emplace(toon, folderHasFile(foldername, toon)).first;
+					ownCopy=it->second;
+				}
+				if(shared>=0 && !ownCopy)
 				{
 					m->shareToon=1;
 					m->shareToonTexture=shared;
@@ -636,6 +646,7 @@ namespace ClosedMMDFormat
 			for(uint32_t i=0; i<rbCount; ++i)
 			{
 				PMXRigidBody *rb=new PMXRigidBody();
+				info.rigidBodies.push_back(rb);
 				rb->name=r.text(20);
 				uint16_t bone=r.u16();
 				rb->group=r.u8();
@@ -650,13 +661,13 @@ namespace ClosedMMDFormat
 				rb->elasticity=r.f32();
 				rb->friction=r.f32();
 				rb->physicsOperation=r.u8();
+				if(rb->shape>RIGID_SHAPE_CAPSULE) fail(fname, "rigid body shape");
 
 				//Without a bone (0xFFFF) the position is relative to センター, but
 				//the body is not attached to it (it must not move the model).
 				int origin=(bone<boneCount) ? (int)bone : centerBone;
 				rb->relatedBoneIndex=(bone<boneCount) ? (int)bone : -1;
 				rb->position=pos + (origin>=0 ? info.bones[origin]->position : glm::vec3(0.0f));
-				info.rigidBodies.push_back(rb);
 			}
 			info.rigid_body_continuing_datasets=info.rigidBodies.size();
 			cout<<"done"<<endl;
@@ -693,6 +704,7 @@ namespace ClosedMMDFormat
 		if(!r.ok()) fail(fname, "physics");
 		cout<<endl;
 
-		return info;
+		sanitizePMXInfo(info);
+		return *pInfo.release();
 	}
 }

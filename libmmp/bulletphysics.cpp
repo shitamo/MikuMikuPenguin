@@ -28,6 +28,7 @@ BulletPhysics::BulletPhysics(std::string vertexShaderPath, std::string fragmentS
 	const double gravity = 9.80665*20/1.58;
 	dynamicsWorld->setGravity(btVector3(0,-gravity,0));
 	
+	debugDrawer=NULL;
 	if(vertexShaderPath!="" && fragmentShaderPath!="")
 	{
 		debugDrawer=new BulletDebugDrawer(vertexShaderPath, fragmentShaderPath);
@@ -40,6 +41,14 @@ BulletPhysics::BulletPhysics(std::string vertexShaderPath, std::string fragmentS
 }
 BulletPhysics::~BulletPhysics()
 {
+	//Remove the constraints (joints) and delete them
+	for(int i=dynamicsWorld->getNumConstraints()-1; i>=0; --i)
+	{
+		btTypedConstraint *constraint=dynamicsWorld->getConstraint(i);
+		dynamicsWorld->removeConstraint(constraint);
+		delete constraint;
+	}
+	
 	//Remove the rigidbodies from the dynamics world and delete them
 	for(int i=dynamicsWorld->getNumCollisionObjects()-1; i>=0; --i)
 	{

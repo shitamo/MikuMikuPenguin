@@ -80,6 +80,9 @@ namespace ClosedMMDFormat
 	PMXInfo &readPMD(std::string foldername,std::string filename);
 	//! Resolve bone parents and rest-pose matrices (used by the loaders).
 	void finalizePMXBones(PMXInfo &pmxInfo);
+	//! Check every index in a model (bones, textures, vertices, materials,
+	//! morphs, rigid bodies) and repair or drop invalid ones; run by the loaders.
+	void sanitizePMXInfo(PMXInfo &pmxInfo);
 	
 	/*!  \class PMXVertex
 	 * \if ENGLISH
@@ -248,10 +251,17 @@ namespace ClosedMMDFormat
 		
 		PMXBone *parent;
 		
-		glm::mat4 calculateGlobalMatrix()
+		//parent->calculateGlobalMatrix() * Local, without recursion (a long
+		//parent chain in a hostile file would overflow the stack)
+		glm::mat4 calculateGlobalMatrix() const
 		{
-			if(parent) return parent->calculateGlobalMatrix() * Local;
-			else return Local;
+			if(!parent) return Local;
+			thread_local std::vector<const PMXBone*> chain;
+			chain.clear();
+			for(const PMXBone *b=this; b; b=b->parent) chain.push_back(b);
+			glm::mat4 m=chain.back()->Local;
+			for(size_t i=chain.size()-1; i-->0; ) m=m*chain[i]->Local;
+			return m;
 		}
 	};
 
@@ -406,6 +416,12 @@ namespace ClosedMMDFormat
 	*/
 	struct PMXInfo
 	{
+		//PMXInfo owns everything its vectors / texturePaths point to.
+		PMXInfo() = default;
+		~PMXInfo();
+		PMXInfo(const PMXInfo&) = delete;
+		PMXInfo &operator=(const PMXInfo&) = delete;
+
 		//For more info, see the PMX documentation included with PMDEditor
 		//also http://gulshan-i-raz.geo.jp/labs/2012/10/17/pmx-format1/
 		
@@ -447,55 +463,55 @@ namespace ClosedMMDFormat
 														//!< \if JAPANESE \brief モデルに関するコメント（英語で）。 \endif
 		
 		//Vertex
-		int vertex_continuing_datasets; 				//!< \if ENGLISH \brief  The number of vertices in the PMX model. \endif
+		int vertex_continuing_datasets=0; 				//!< \if ENGLISH \brief  The number of vertices in the PMX model. \endif
 														//!< \if JAPANESE \brief PMXモデルに格納されている頂点の数。 \endif
 		std::vector<PMXVertex*> vertices;				//!< \if ENGLISH \brief  A vector containing the vertices. \endif
 														//!< \if JAPANESE \brief 頂点の配列（vector式） \endif
 		
 		//Face
-		int face_continuing_datasets;					//!< \if ENGLISH \brief  The number of faces in the PMX model. \endif
+		int face_continuing_datasets=0;					//!< \if ENGLISH \brief  The number of faces in the PMX model. \endif
 														//!< \if JAPANESE \brief PMXモデルに格納されている面の数。 \endif
 		std::vector<PMXFace*> faces;					//!< \if ENGLISH \brief  A vector containing the faces. \endif
 														//!< \if JAPANESE \brief 面の配列（vector式） \endif
 		
 		//Texture
-		int texture_continuing_datasets;				//!< \if ENGLISH \brief  The number of textures in the PMX model. \endif
+		int texture_continuing_datasets=0;				//!< \if ENGLISH \brief  The number of textures in the PMX model. \endif
 														//!< \if JAPANESE \brief PMXモデルに格納されているテクスチャの数。 \endif
-		std::string *texturePaths;						//!< \if ENGLISH \brief  A pointer containing an array texture paths. \endif
+		std::string *texturePaths=nullptr;						//!< \if ENGLISH \brief  A pointer containing an array texture paths. \endif
 														//!< \if JAPANESE \brief テクスチャのパスの配列へのポインター。 \endif
 		
 		//Material
-		int material_continuing_datasets;				//!< \if ENGLISH \brief  The number of materials in the PMX model. \endif
+		int material_continuing_datasets=0;				//!< \if ENGLISH \brief  The number of materials in the PMX model. \endif
 														//!< \if JAPANESE \brief PMXモデルに格納されているマテリアルの数。 \endif
 		std::vector<PMXMaterial*> materials;			//!< \if ENGLISH \brief  A vector containing the materials. \endif
 														//!< \if JAPANESE \brief マテリアルの配列（vector式） \endif
 		
 		//Bone
-		int bone_continuing_datasets;					//!< \if ENGLISH \brief  The number of bones in the PMX model. \endif
+		int bone_continuing_datasets=0;					//!< \if ENGLISH \brief  The number of bones in the PMX model. \endif
 														//!< \if JAPANESE \brief PMXモデルに格納されているボーンの数。 \endif
 		std::vector<PMXBone*> bones;					//!< \if ENGLISH \brief  A vector containing the bones. \endif
 														//!< \if JAPANESE \brief ボーンの配列（vector式） \endif
 		
 		//Morph (Emotion data)
-		int morph_continuing_datasets;					//!< \if ENGLISH \brief  The number of morphs in the PMX model. \endif
+		int morph_continuing_datasets=0;					//!< \if ENGLISH \brief  The number of morphs in the PMX model. \endif
 														//!< \if JAPANESE \brief PMXモデルに格納されているモーフの数。 \endif
 		std::vector<PMXMorph*> morphs;					//!< \if ENGLISH \brief  A vector containing the bones. \endif
 														//!< \if JAPANESE \brief モーフの配列（vector式） \endif
 		
 		//Display Frame
-		int display_frame_continuing_datasets;			//!< \if ENGLISH \brief  The number of display frames in the PMX model. \endif
+		int display_frame_continuing_datasets=0;			//!< \if ENGLISH \brief  The number of display frames in the PMX model. \endif
 														//!< \if JAPANESE \brief PMXモデルに格納されている表示枠の数。 \endif
 		std::vector<PMXDisplayFrame*> displayFrames;	//!< \if ENGLISH \brief  A vector containing the display frames. \endif
 														//!< \if JAPANESE \brief 表示枠の配列（vector式） \endif
 		
 		//Rigid Body
-		int rigid_body_continuing_datasets;				//!< \if ENGLISH \brief  The number of rigidbodies in the PMX model. \endif
+		int rigid_body_continuing_datasets=0;				//!< \if ENGLISH \brief  The number of rigidbodies in the PMX model. \endif
 														//!< \if JAPANESE \brief PMXモデルに格納されている剛体の数。 \endif
 		std::vector<PMXRigidBody*> rigidBodies;			//!< \if ENGLISH \brief  A vector containing the rigidbodies. \endif
 														//!< \if JAPANESE \brief 剛体の配列（vector式） \endif
 		
 		//Joint
-		int joint_continuing_datasets;					//!< \if ENGLISH \brief  The number of joints in the PMX model. \endif
+		int joint_continuing_datasets=0;					//!< \if ENGLISH \brief  The number of joints in the PMX model. \endif
 														//!< \if JAPANESE \brief PMXモデルに格納されているジョイントの数。 \endif
 		std::vector<PMXJoint*> joints;					//!< \if ENGLISH \brief  A vector containing the joints. \endif
 														//!< \if JAPANESE \brief ジョイントの配列（vector式） \endif

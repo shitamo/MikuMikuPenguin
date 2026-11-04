@@ -117,13 +117,15 @@ void MMDPhysics::createRigidBody()
 		rigidBodies[i]->Init=world;
 		rigidBodies[i]->Offset=glm::inverse(world);
 
-		if (rigidBodies[i]->shape == RIGID_SHAPE_SPHERE) //球
+		//exactly one Bullet body per rigid body (the indices must match);
+		//an unknown shape (only in hand-built models) becomes a sphere
+		if (rigidBodies[i]->shape != RIGID_SHAPE_CUBE && rigidBodies[i]->shape != RIGID_SHAPE_CAPSULE) //球
 		{
 			float radius = rigidBodies[i]->size.x;
 			
 			this->rigidBodies.push_back(bulletPhysics->CreateSphere(
 radius, &world, rigidBodies[i]->mass, rigidBodies[i]->elasticity, rigidBodies[i]->friction, rigidBodies[i]->movementDecay,
-rigidBodies[i]->rotationDecay, rigidBodies[i]->physicsOperation == 0, 1 << rigidBodies[i]->group, rigidBodies[i]->noCollisionGroupFlag));
+rigidBodies[i]->rotationDecay, rigidBodies[i]->physicsOperation == 0, (unsigned short)(1u << (rigidBodies[i]->group & 15)), rigidBodies[i]->noCollisionGroupFlag));
 				
 			const unsigned int slices = 10, stacks = 5;
 			//createSphere(radius,slices,stacks); //D3DXCreateSphere(pDevice, radius, slices, stacks, &mesh, 0);
@@ -135,7 +137,7 @@ rigidBodies[i]->rotationDecay, rigidBodies[i]->physicsOperation == 0, 1 << rigid
 			
 			this->rigidBodies.push_back(bulletPhysics->CreateBox(
 width, height, depth, &world, rigidBodies[i]->mass, rigidBodies[i]->elasticity, rigidBodies[i]->friction, rigidBodies[i]->movementDecay,
-rigidBodies[i]->rotationDecay, rigidBodies[i]->physicsOperation == 0, 1 << rigidBodies[i]->group, rigidBodies[i]->noCollisionGroupFlag));
+rigidBodies[i]->rotationDecay, rigidBodies[i]->physicsOperation == 0, (unsigned short)(1u << (rigidBodies[i]->group & 15)), rigidBodies[i]->noCollisionGroupFlag));
 
 			//D3DXCreateBox(pDevice, width, height, depth, &mesh, 0);
 			//vector<glm::vec3> mesh=createBox(width,height,depth);
@@ -148,7 +150,7 @@ rigidBodies[i]->rotationDecay, rigidBodies[i]->physicsOperation == 0, 1 << rigid
 			
 			this->rigidBodies.push_back(bulletPhysics->CreateCapsule(
 radius, height, &world, rigidBodies[i]->mass, rigidBodies[i]->elasticity, rigidBodies[i]->friction, rigidBodies[i]->movementDecay,
-rigidBodies[i]->rotationDecay, rigidBodies[i]->physicsOperation == 0, 1 << rigidBodies[i]->group, rigidBodies[i]->noCollisionGroupFlag));
+rigidBodies[i]->rotationDecay, rigidBodies[i]->physicsOperation == 0, (unsigned short)(1u << (rigidBodies[i]->group & 15)), rigidBodies[i]->noCollisionGroupFlag));
 				
 			const unsigned int slices = 10, stacks = 5;
 			//D3DXCreateCylinder(pDevice, radius, radius, height, slices, stacks, &mesh, 0);	// カプセル形状の代わりに円柱で表示
@@ -163,6 +165,10 @@ void MMDPhysics::createJoints()
 	for (unsigned int i = 0; i<pmxInfo.joint_continuing_datasets; ++i)
 	{
 		PMXJoint *joint=pmxInfo.joints[i];
+		//the loaders drop joints without rigid body A; check anyway
+		const int bodyCount=(int)rigidBodies.size();
+		if(joint->relatedRigidBodyIndexA<0 || joint->relatedRigidBodyIndexA>=bodyCount ||
+		   joint->relatedRigidBodyIndexB<-1 || joint->relatedRigidBodyIndexB>=bodyCount) continue;
 		
 		glm::vec3 c_p1=(joint->movementLowerLimit);
 		glm::vec3 c_p2(joint->movementUpperLimit);
@@ -210,13 +216,20 @@ void MMDPhysics::createJoints()
 }
 
 
+//Bone a rigid body is attached to, or -1
+static int attachedBone(const PMXInfo &pmxInfo, const PMXRigidBody *rb)
+{
+	int b = rb->relatedBoneIndex;
+	return (b >= 0 && b < pmxInfo.bone_continuing_datasets) ? b : -1;
+}
+
 void MMDPhysics::updateBones(bool physicsEnabled)
 {
 	// ボーン追従タイプの剛体にボーン行列を設定
-	for (unsigned int i_rb = 0; i_rb<pmxInfo.rigidBodies.size(); ++i_rb)
+	for (unsigned int i_rb = 0; i_rb<pmxInfo.rigidBodies.size() && i_rb<rigidBodies.size(); ++i_rb)
 	{
 		// ボーン追従タイプ以外の剛体は飛ばす
-		if (pmxInfo.rigidBodies[i_rb]->relatedBoneIndex == -1 ||
+		if (attachedBone(pmxInfo, pmxInfo.rigidBodies[i_rb]) == -1 ||
 			pmxInfo.rigidBodies[i_rb]->physicsOperation != RIGID_TYPE_FOLLOWER)
 		{
 			continue;
@@ -236,10 +249,10 @@ void MMDPhysics::updateBones(bool physicsEnabled)
 	// Appearance Miku & TDA Mikuでテストし収束ループは２回とした
 	for (int i_it = 0; i_it < 2; ++i_it)
 	{
-		for (unsigned int i_rb = 0; i_rb < rigidBodies.size(); ++i_rb)
+		for (unsigned int i_rb = 0; i_rb < rigidBodies.size() && i_rb < pmxInfo.rigidBodies.size(); ++i_rb)
 		{
 			// ボーン追従タイプの剛体は飛ばす
-			if (pmxInfo.rigidBodies[i_rb]->relatedBoneIndex == -1 ||
+			if (attachedBone(pmxInfo, pmxInfo.rigidBodies[i_rb]) == -1 ||
 				pmxInfo.rigidBodies[i_rb]->physicsOperation == RIGID_TYPE_FOLLOWER)
 			{
 				continue;

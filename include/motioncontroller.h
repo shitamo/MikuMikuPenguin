@@ -132,6 +132,8 @@ class VMDMotionController
 	void applyInheritance(int boneIndex, std::vector<char> &state);
 	void solveIKBone(int boneIndex);
 	std::vector<int> boneOrder; //bones in deformation order (level, index)
+	std::vector<int> parentFirstOrder; //every bone after its parent (for updateBoneMatrix)
+	std::vector<glm::mat4> globalMatrices; //scratch: global bone matrices
 	void solveIK(ClosedMMDFormat::PMXBone *joint, int effector, glm::vec3 targetPos, int numIteration, int numBones, int numMaxBones);
 	
 	

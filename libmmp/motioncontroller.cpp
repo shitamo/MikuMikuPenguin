@@ -89,6 +89,33 @@ VMDMotionController::VMDMotionController(PMXInfo &pmxInfo,VMDInfo &vmdInfo,GLuin
 		return A->transformationLevel<B->transformationLevel;
 	});
 	
+	//Parents before children, to compute all global matrices in one pass
+	//(calling calculateGlobalMatrix() for every bone is quadratic in the
+	//depth of the bone tree)
+	{
+		const int n=pmxInfo.bone_continuing_datasets;
+		std::vector<int> depth(n, -1);
+		std::vector<int> path;
+		for(int i=0; i<n; ++i)
+		{
+			int j=i;
+			path.clear();
+			while(j>=0 && depth[j]<0)
+			{
+				path.push_back(j);
+				const PMXBone *b=pmxInfo.bones[j];
+				int p=b->parentBoneIndex;
+				j=(b->parent && p>=0 && p<n && pmxInfo.bones[p]==b->parent) ? p : -1;
+			}
+			int d=(j>=0) ? depth[j] : -1;
+			for(size_t k=path.size(); k-->0; ) depth[path[k]]=++d;
+		}
+		parentFirstOrder.resize(n);
+		for(int i=0; i<n; ++i) parentFirstOrder[i]=i;
+		std::stable_sort(parentFirstOrder.begin(), parentFirstOrder.end(),
+			[&](int a, int b){ return depth[a]<depth[b]; });
+	}
+	
 	//***INIT SHOW/IK FRAMES (model visibility and IK on/off; step keys)***
 	ikEnableKeys.resize(pmxInfo.bone_continuing_datasets);
 	{
@@ -117,7 +144,7 @@ VMDMotionController::VMDMotionController(PMXInfo &pmxInfo,VMDInfo &vmdInfo,GLuin
 	#endif
 	
 	//***INIT VERTEX DATA VARIABLES***
-	vertexData = (VertexData*)malloc(pmxInfo.vertex_continuing_datasets*sizeof(VertexData)*2);
+	vertexData = (VertexData*)malloc((pmxInfo.vertex_continuing_datasets>0 ? pmxInfo.vertex_continuing_datasets : 1)*sizeof(VertexData)*2);
 	for(int i=0; i<pmxInfo.vertex_continuing_datasets; ++i)
 	{
 		vertexData[i].position.x=pmxInfo.vertices[i]->pos[0];
@@ -214,7 +241,7 @@ VMDMotionController::~VMDMotionController()
 	delete[] skinMatrix;
 	glDeleteTextures(1, &boneTexture);
 	glDeleteBuffers(1, &boneBuffer);
-	//free(vertexData);
+	free(vertexData);
 }
 
 void VMDMotionController::updateVertexMorphs()
@@ -437,9 +464,16 @@ void VMDMotionController::updateMaterialMorphs()
 
 void VMDMotionController::updateBoneMatrix()
 {
-	for(unsigned i = 0; i < pmxInfo.bone_continuing_datasets; i++)
+	//same products as PMXBone::calculateGlobalMatrix(), parents first
+	globalMatrices.resize(pmxInfo.bone_continuing_datasets);
+	for(int i : parentFirstOrder)
 	{
-		skinMatrix[i] = pmxInfo.bones[i]->calculateGlobalMatrix() * invBindPose[i];
+		const PMXBone *b=pmxInfo.bones[i];
+		int p=b->parentBoneIndex;
+		if(!b->parent) globalMatrices[i]=b->Local;
+		else if(p>=0 && p<pmxInfo.bone_continuing_datasets && pmxInfo.bones[p]==b->parent) globalMatrices[i]=globalMatrices[p]*b->Local;
+		else globalMatrices[i]=b->calculateGlobalMatrix();
+		skinMatrix[i] = globalMatrices[i] * invBindPose[i];
 	}
 	glBindBuffer(GL_TEXTURE_BUFFER, boneBuffer);
 	glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(glm::mat4)*pmxInfo.bone_continuing_datasets, skinMatrix);
@@ -695,7 +729,10 @@ void VMDMotionController::solveIKBone(int b)
 	{
 		PMXBone *IKBone=pmxInfo.bones[b];
 
-		if(IKBone->IK && isIKEnabled(b)) //IKフラグをチェック (VMD can switch IK off)
+		//IKフラグをチェック (VMD can switch IK off); the loaders validate the
+		//indices, but models can also be built by hand
+		if(IKBone->IK && isIKEnabled(b) &&
+		   IKBone->IKTargetBoneIndex>=0 && IKBone->IKTargetBoneIndex<pmxInfo.bone_continuing_datasets)
 		{
 			//cout<<IKBone->name<<endl;
 			
@@ -706,11 +743,13 @@ void VMDMotionController::solveIKBone(int b)
 			//cout<<targetBone->name<<endl;
 			
 			//cout<<IKBone->IKLoopCount<<endl;
-			for( int iterations = 0; iterations < IKBone->IKLoopCount; iterations++ )
+			const int linkCount=std::min((int)IKBone->IKLinkNum, (int)IKBone->IKLinks.size());
+			for( unsigned iterations = 0; iterations < IKBone->IKLoopCount; iterations++ )
 			{
-				for( int attentionIndex=0 ; attentionIndex<IKBone->IKLinkNum; attentionIndex++ )
+				for( int attentionIndex=0 ; attentionIndex<linkCount; attentionIndex++ )
 				{
 					PMXIKLink *IKLink=IKBone->IKLinks[attentionIndex];
+					if(IKLink->linkBoneIndex<0 || IKLink->linkBoneIndex>=pmxInfo.bone_continuing_datasets) continue;
 					PMXBone *linkBone=pmxInfo.bones[IKLink->linkBoneIndex];
 					
 					//cout<<linkBone->name<<endl;
