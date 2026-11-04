@@ -5,6 +5,7 @@
 #include "mmp_glm.h"
 #include "cameracontroller.h"
 #include "lightcontroller.h"
+#include "postfx.h"
 
 #include <vector>
 #include <string>
@@ -22,6 +23,7 @@ enum Uniform_IDs {
 	uLightColor,uUseToon,uMV,uScreenSize,
 	uSphereMul,uSphereAdd,uToonMul,uToonAdd,
 	uRenderMode,uGroundShadowColor,uSelfShadow,uShadowMap,uShadowTexelSize,uShadowMVP,
+	uGlowMode,uGlowThreshold,
 	NumUniforms };
 
 //Texture unit of the self-shadow depth map (0-2 material textures, 3 bones)
@@ -110,6 +112,10 @@ class Viewer
 	bool snapshot(int frame, const std::string &pngPath);
 	void setLoop(bool loop) { loopPlayback=loop; } //!< restart from the beginning at the end of the motion
 	void setGUI(bool enable) { guiVisible=enable; } //!< show the on-screen controls
+	void setEffects(const EffectSettings &e) { postfx.settings=e; } //!< screen effects (all off by default)
+	private:
+	void renderWithEffects(GLuint output); //!< render() through the screen effects into `output`
+	public:
 		
 	
 	private:
@@ -138,6 +144,7 @@ class Viewer
 	float lastTheta, lastZenith, lastRadius; //to detect manual camera moves
 	glm::vec3 modelMin, modelMax; //bounds of the whole scene at rest
 	glm::mat4 viewMatrix;
+	float focusDistance; //!< camera to its point of interest (depth of field)
 	bool keyPressed(int key);
 	void handleKey(int key, int mods, bool repeat); //!< key press (or auto-repeat) from the GLFW key callback
 	
@@ -231,6 +238,10 @@ class Viewer
 	void drawShadowCasters(SceneModel &m, int renderMode); //geometry only, for the shadow passes
 	void renderShadowMap(const glm::mat4 &lightVP);
 	void drawGroundShadow(const glm::vec3 &lightDir);
+	
+	//***Screen effects (bloom, glow, depth of field, SSAO, colour, FXAA)
+	PostEffects postfx;
+	std::string shaderDir; //!< "shaders" or the installed directory
 	
 	
 	GLFWwindow *window;

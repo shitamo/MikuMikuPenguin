@@ -1,3 +1,17 @@
+mikumikupenguin (0.2.1+GLFW3.6) unstable; urgency=medium
+
+  * Add MME-like screen effects drawn by the viewer (no .fx files): bloom,
+    AutoLuminous-like glow, depth of field (focus on the camera's point of
+    interest or fixed), SSAO, colour correction and FXAA.  The scene goes
+    through a floating point offscreen framebuffer and full-screen passes
+    only while an effect is on; all effects are off by default.
+  * Effects section in the settings panel; --effect, --dof-focus and
+    --color options; the effects are also applied to --render videos and
+    --snapshot images.
+  * Install the effect shaders in /usr/share/mikumikupenguin/shaders/postfx.
+
+ -- shitamo <sitamo@gmail.com>  Thu, 05 Nov 2026 00:30:00 +0900
+
 mikumikupenguin (0.2.1+GLFW3.5) unstable; urgency=medium
 
   * Video output like MMD's AVI output: pmx --render FILE [--range A:B]

@@ -18,6 +18,7 @@
 
 #include <libmmp.h>
 #include "viewer.h"
+#include "effects.h"
 
 #include <strings.h>
 
@@ -48,7 +49,15 @@ void printHelpInfo()
 	<<"  --size WxH\tWindow size, or the video size with --render (default 1280x720)"<<endl
 	<<"  --snapshot FRAME OUT.png"<<endl
 	<<"\t\tPlay to VMD frame FRAME (with physics), save that frame as a PNG"<<endl
-	<<"\t\tand exit, without showing the window or the controls (for tests)"<<endl<<endl
+	<<"\t\tand exit, without showing the window or the controls (for tests)"<<endl
+	<<"  --effect LIST\tScreen effects to turn on, comma separated: bloom, glow"<<endl
+	<<"\t\t(AutoLuminous-like), dof, ssao, color, fxaa, all; NAME=VALUE also sets"<<endl
+	<<"\t\tthe strength (e.g. --effect bloom=1.2,dof)"<<endl
+	<<"  --dof-focus D\tFocus distance of the depth of field (default: the camera's"<<endl
+	<<"\t\tpoint of interest)"<<endl
+	<<"  --color B,C,S,G\tColour correction: brightness, contrast, saturation, gamma"<<endl
+	<<"\t\t(defaults 0,1,1,1)"<<endl
+	<<endl
 	<<"Video output (like MMD's AVI output; no window is shown, the program quits when done):"<<endl
 	<<"  --render FILE\tWrite the motion to FILE frame by frame and exit."<<endl
 	<<"\t\tFILE.png (or FILE_%04d.png, or a directory/) writes numbered PNG files;"<<endl
@@ -102,6 +111,7 @@ int main(int argc, char** argv)
 	bool render=false;
 	RecordSettings record;
 	bool recordOptions=false; //--range/--size/--fps without --render
+	EffectSettings effects;
 	
 	int count=0;
 	if(argc > 1)
@@ -155,6 +165,31 @@ int main(int argc, char** argv)
 				snapshotFrame=(int)f;
 				snapshotPath=argv[count+2];
 				count+=2;
+			}
+			else if(string(argv[count]) == "--effect" || string(argv[count]) == "--effects")
+			{
+				string error;
+				if(count+1>=argc) { cerr<<"--effect needs a list (e.g. bloom,dof)"<<endl; return 1; }
+				if(!parseEffectList(argv[++count], effects, error)) { cerr<<error<<endl; return 1; }
+			}
+			else if(string(argv[count]) == "--color")
+			{
+				string error;
+				if(count+1>=argc) { cerr<<"--color needs brightness,contrast,saturation,gamma"<<endl; return 1; }
+				if(!parseColorAdjust(argv[++count], effects, error)) { cerr<<error<<endl; return 1; }
+			}
+			else if(string(argv[count]) == "--dof-focus")
+			{
+				float d=0.0f;
+				if(count+1>=argc || sscanf(argv[count+1], "%f", &d)!=1 || !(d>0.0f))
+				{
+					cerr<<"--dof-focus needs a distance > 0"<<endl;
+					return 1;
+				}
+				++count;
+				effects.dofFocus=d;
+				effects.dofAutoFocus=false;
+				effects.dof=true;
 			}
 			else if(string(argv[count]) == "--loop")
 			{
@@ -272,6 +307,7 @@ int main(int argc, char** argv)
 			options.hidden=true;
 			options.multisample=false;
 			Viewer viewer(models,"",camera_file,light_file,options);
+			viewer.setEffects(effects);
 			return viewer.snapshot(snapshotFrame, snapshotPath) ? 0 : 1;
 		}
 		if(render)
@@ -283,6 +319,7 @@ int main(int argc, char** argv)
 		
 		viewer.setLoop(loop);
 		viewer.setGUI(gui);
+		viewer.setEffects(effects);
 		if(render) viewer.setRender(record);
 		return viewer.run();
 	}

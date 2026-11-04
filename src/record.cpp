@@ -161,7 +161,7 @@ void Viewer::renderRecordFrame()
 	glClearColor(1, 1, 1, 1);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	updateCameraUniforms(); //projection for the video's aspect ratio
-	render();
+	renderWithEffects(recFBO); //the screen effects are in the video too
 
 	//resolve the multisampled image and read it back
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, recFBO);

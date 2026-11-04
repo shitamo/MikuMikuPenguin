@@ -1,9 +1,9 @@
-.TH PMX "1" "November 2026" "PMXViewer v0.2.1+GLFW3.5" "User Commands"
+.TH PMX "1" "November 2026" "PMXViewer v0.2.1+GLFW3.6" "User Commands"
 .SH NAME
 pmx \- MikuMikuDance PMX/PMD model / VMD motion viewer (MikuMikuPenguin)
 .SH SYNOPSIS
 .B pmx
-[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] [\fB\-\-loop\fR] [\fB\-\-no\-gui\fR] {\fImodel.pmx\fR|\fImodel.pmd\fR} [\fImotion.vmd\fR] [\fB\-\-pos\fR \fIX,Y,Z\fR] [\fImodel2\fR [\fImotion2.vmd\fR] ...]
+[\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] [\fB\-\-loop\fR] [\fB\-\-no\-gui\fR] [\fB\-\-effect\fR \fIlist\fR] [\fB\-\-dof\-focus\fR \fIdistance\fR] [\fB\-\-color\fR \fIB,C,S,G\fR] {\fImodel.pmx\fR|\fImodel.pmd\fR} [\fImotion.vmd\fR] [\fB\-\-pos\fR \fIX,Y,Z\fR] [\fImodel2\fR [\fImotion2.vmd\fR] ...]
 .br
 .B pmx
 \fB\-\-render\fR \fIoutput\fR [\fB\-\-range\fR \fIstart\fR:\fIend\fR] [\fB\-\-size\fR \fIW\fRx\fIH\fR] [\fB\-\-fps\fR 30|60] [\fB\-\-no\-music\fR] [\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] \fImodel\fR [\fImotion.vmd\fR] ...
@@ -104,6 +104,23 @@ Frame rate of the video (default 30).
 \fB\-\-no\-music\fR
 Do not put the \fB\-s\fR music into the video.
 .TP
+\fB\-\-effect\fR \fIlist\fR
+Turn on screen effects (see \fBSCREEN EFFECTS\fR); \fIlist\fR is a comma
+separated list of \fBbloom\fR, \fBglow\fR (also \fBal\fR, \fBautoluminous\fR),
+\fBdof\fR, \fBssao\fR, \fBcolor\fR, \fBfxaa\fR, \fBall\fR and \fBnone\fR.
+\fIname\fB=\fIvalue\fR also sets the main strength of an effect: the
+intensity of bloom and glow, the strength of the depth of field and of SSAO.
+Example: \fB\-\-effect bloom=1.2,dof\fR.
+.TP
+\fB\-\-dof\-focus\fR \fIdistance\fR
+Turn the depth of field on with a fixed focus distance (MMD units from the
+camera) instead of the camera's point of interest.
+.TP
+\fB\-\-color\fR \fIB,C,S,G\fR
+Turn colour correction on with brightness (added, default 0), contrast
+(default 1), saturation (default 1) and gamma (default 1; above 1 brightens
+the mid tones).  Trailing values may be left out.
+.TP
 \fB\-\-help\fR
 display help and exit
 .TP
@@ -169,6 +186,47 @@ reset the camera (front view framing the whole model)
 .TP
 .B Esc
 quit
+.SH SCREEN EFFECTS
+The viewer can add looks that MMD users get from MME (MikuMikuEffect)
+effects; no .fx files are read.  With any effect on, the scene is drawn into
+a floating point offscreen framebuffer (multisampled like the window, with
+depth and stencil), processed by full-screen passes and then shown; the
+on-screen controls are drawn afterwards.  All effects are off at start, and
+while they are off the scene is drawn directly into the window as before.
+They are turned on and adjusted in the \fBEffects\fR section of the settings
+panel, or with \fB\-\-effect\fR.  They are also applied to the
+\fB\-\-render\fR video and to \fB\-\-snapshot\fR images.
+.TP
+.B Bloom
+Parts brighter than the threshold (luminance 0\-1) bleed into their
+surroundings.  Settings: intensity, threshold, spread.
+.TP
+.B Glow (AutoLuminous-like)
+Materials with a specular power (reflection strength) of 110 or more emit
+light in their own colour, more for higher values, as with AutoLuminous.
+Optionally the brightest parts of the models (luminance above a threshold)
+glow too.  The light spreads like the bloom.  Settings: intensity, bright
+parts on/off and threshold.
+.TP
+.B Depth of field
+Blurs what is nearer or farther than the focus distance.  The focus follows
+the camera's point of interest by default (the interest point of the camera
+motion; the orbit centre of the free camera), or is set by hand.  Settings:
+focus distance, strength (how fast things blur away from the focus), maximum
+blur (1 = 1/40 of the picture height).
+.TP
+.B SSAO
+Screen-space ambient occlusion: darkens creases and places hidden from the
+open space.  Settings: strength, radius (MMD units).
+.TP
+.B Colour correction
+Brightness, contrast, saturation and gamma of the final picture.
+.TP
+.B FXAA
+Fast approximate anti-aliasing of the final picture.
+.PP
+SSAO, the depth of field blur and the bloom are computed at half resolution
+or below, and effects that are off are skipped.
 .SH EXAMPLES
 .TP
 .B pmx \-\-render dance.mp4 \-s song.wav \-c camera.vmd miku.pmx dance.vmd
@@ -176,11 +234,14 @@ the whole dance with music as an H.264 video (1280x720, 30 fps)
 .TP
 .B pmx \-\-render frames/ \-\-range 300:449 \-\-size 1920x1080 \-\-fps 60 miku.pmx dance.vmd
 five seconds as 300 PNG files frames/00000.png ... frames/00299.png
+.TP
+.B pmx \-\-render dance.mp4 \-\-effect bloom,glow,fxaa \-s song.wav miku.pmx dance.vmd
+the same with bloom, glow and anti-aliasing
 .SH FILES
 .TP
 .I /usr/share/mikumikupenguin/shaders/
-GLSL shaders (a \fIshaders/\fR directory in the current directory takes
-precedence).
+GLSL shaders, with the screen effects in \fIpostfx/\fR (a \fIshaders/\fR
+directory in the current directory takes precedence).
 .TP
 .I /usr/share/mikumikupenguin/textures/
 shared toon textures toon01.bmp \- toon10.bmp.

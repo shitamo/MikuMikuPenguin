@@ -1,5 +1,5 @@
 project('mikumikupenguin', 'cpp',
-  version : '0.2.1+GLFW3.5',
+  version : '0.2.1+GLFW3.6',
   license : 'GPL-3.0-only',
   meson_version : '>= 0.60.0',
   default_options : [
@@ -160,6 +160,8 @@ pmx_sources = [
   'src/gui.cpp',
   'src/record.cpp',
   'src/videowriter.cpp',
+  'src/effects.cpp',
+  'src/postfx.cpp',
 ]
 if sound_backend != 'none'
   pmx_sources += 'src/sound.cpp'
@@ -177,6 +179,14 @@ pmx_exe = executable('pmx', pmx_sources,
 install_data('shaders/model.vert', 'shaders/model.frag',
              'shaders/bulletDebug.vert', 'shaders/bulletDebug.frag',
   install_dir : pkgdatadir / 'shaders')
+install_data(
+  'shaders/postfx/fullscreen.vert',
+  'shaders/postfx/ssao.frag', 'shaders/postfx/ssao_blur.frag',
+  'shaders/postfx/dof_prefilter.frag', 'shaders/postfx/dof_blur.frag',
+  'shaders/postfx/bloom_prefilter.frag', 'shaders/postfx/bloom_down.frag',
+  'shaders/postfx/bloom_up.frag', 'shaders/postfx/composite.frag',
+  'shaders/postfx/fxaa.frag',
+  install_dir : pkgdatadir / 'shaders' / 'postfx')
 install_data(
   'data/share/toon01.bmp', 'data/share/toon02.bmp', 'data/share/toon03.bmp',
   'data/share/toon04.bmp', 'data/share/toon05.bmp', 'data/share/toon06.bmp',
@@ -208,6 +218,11 @@ test('deep bone chain', regress_test, args : ['--deep-bone-chain'], suite : 'loa
 if get_option('fuzz')
   subdir('test/fuzz')
 endif
+
+# Screen-effect settings and option parsing (no GL needed)
+effects_test = executable('effects_test', 'test/effects_test.cpp', 'src/effects.cpp',
+  include_directories : include_directories('src'))
+test('effects', effects_test, suite : 'unit')
 
 summary({
   'C++ standard' : get_option('cpp_std'),
