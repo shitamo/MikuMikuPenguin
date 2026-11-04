@@ -10,6 +10,7 @@ project('mikumikupenguin', 'cpp',
   ])
 
 cxx = meson.get_compiler('cpp')
+python3_prog = find_program('python3')
 pkgdatadir = get_option('prefix') / get_option('datadir') / 'mikumikupenguin'
 
 # ---------------------------------------------------------------- dependencies
@@ -95,7 +96,7 @@ configure_file(output : 'config.h', configuration : conf)
 mmp_inc = include_directories('include', 'libmmp')
 mmp_deps = [glfw_dep, epoxy_dep, bullet_dep, glm_dep, iconv_dep]
 
-libmmp = library('mmp',
+libmmp_sources = files(
   'libmmp/pmx.cpp',
   'libmmp/vmd.cpp',
   'libmmp/motioncontroller.cpp',
@@ -109,6 +110,8 @@ libmmp = library('mmp',
   'libmmp/cameracontroller.cpp',
   'libmmp/lightcontroller.cpp',
   'libmmp/pmd.cpp',
+)
+libmmp = library('mmp', libmmp_sources,
   include_directories : mmp_inc,
   dependencies : mmp_deps,
   install : true)
@@ -187,9 +190,29 @@ glm_helper_test = executable('glm_helper_test', 'test/glm_helper_test.cpp',
   dependencies : libmmp_dep)
 test('glm_helper', glm_helper_test)
 
+# Loader regression tests: broken / hostile files that used to crash, hang or
+# allocate huge amounts of memory (test/regress), the fuzzing seeds, and a
+# generated 65535-bone chain.  Most useful in a sanitizer build
+# (-Db_sanitize=address,undefined).
+regress_test = executable('regress_test', 'test/regress_test.cpp', 'test/fuzz/fuzz_common.cpp',
+  dependencies : libmmp_dep)
+regress_files = run_command(python3_prog, files('test/list_test_files.py'), check : true).stdout().strip().split('\n')
+foreach f : regress_files
+  if f != ''
+    test('load ' + f, regress_test, args : [meson.current_source_dir() / 'test' / f],
+      suite : 'loaders', timeout : 120)
+  endif
+endforeach
+test('deep bone chain', regress_test, args : ['--deep-bone-chain'], suite : 'loaders', timeout : 300)
+
+if get_option('fuzz')
+  subdir('test/fuzz')
+endif
+
 summary({
   'C++ standard' : get_option('cpp_std'),
   'Sound' : sound_backend,
   'GUI' : gui_enabled,
+  'Fuzz targets' : get_option('fuzz'),
   'Data directory' : pkgdatadir,
 }, section : 'MikuMikuPenguin')

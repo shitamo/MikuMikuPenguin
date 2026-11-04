@@ -32,6 +32,7 @@ The contents are listed below:
 * shaders: PMXViewer's shaders are in this folder.
 * src: PMXViewer's source code (.cpp, .h) are in this folder.
 * data: Required textures and other data files are in this folder.
+* test: Tests. test/regress holds broken files for the loader regression tests, test/fuzz the fuzz targets.
 
 ## Requirements
 For LibMikuMikuPenguin, GLFW 3, libepoxy, GLM, Bullet and iconv are needed.
@@ -54,3 +55,37 @@ To install libmmp and PMXViewer on your system, run:
 
 Use `meson setup build -Dsound=disabled -Dgui=disabled` to build without music playback or on-screen controls.
 A Debian package can be built with `dpkg-buildpackage -us -uc -b`.
+
+`meson test` includes loader regression tests that feed broken / hostile PMX, PMD and VMD files to
+libmmp (test/regress).  To catch memory errors too, run them in a sanitizer build:
+
+    $ meson setup build-asan -Db_sanitize=address,undefined
+    $ meson test -C build-asan
+
+## Fuzzing
+
+The PMX, PMD and VMD loaders have libFuzzer targets (test/fuzz).  After loading, they also play a
+motion on the model (morphs, IK, inheritance) and set up and step its physics (OpenGL calls are
+replaced by dummy functions).  Build them with clang and `-Dfuzz=true`:
+
+    $ sudo apt install clang libclang-rt-dev     # Debian/Ubuntu
+    $ CC=clang CXX=clang++ meson setup build-fuzz -Dfuzz=true -Dgui=disabled -Dsound=disabled
+    $ meson compile -C build-fuzz fuzz_pmx fuzz_pmd fuzz_vmd
+
+The seeds are in test/fuzz/seeds (small synthetic files made by `python3 test/fuzz/make_seeds.py`).
+Copy them to a corpus directory and run:
+
+    $ mkdir -p corpus/pmx && cp test/fuzz/seeds/pmx/* corpus/pmx/
+    $ build-fuzz/test/fuzz/fuzz_pmx corpus/pmx -max_total_time=3600 -timeout=10 \
+          -rss_limit_mb=2048 -malloc_limit_mb=512 -max_len=16384
+
+`fuzz_pmd` and `fuzz_vmd` work the same way (seeds in test/fuzz/seeds/pmd and test/fuzz/seeds/vmd).
+Add `-fork=N` to use several cores (and `-ignore_crashes=1` to keep going after a crash).  A
+reported input (crash-*) is reproduced with `build-fuzz/test/fuzz/fuzz_pmx crash-...`; once fixed,
+add a small reproducer to test/regress (`python3 test/regress/make_regress.py` generates the
+existing ones; files named `*.reject.*` must fail to load, the others must load).
+
+Load errors are reported with `std::runtime_error`.  Indices are checked when a model is loaded:
+optional references (textures, bones, display frames, ...) that point nowhere become "none", and
+entries that cannot work (joints without their rigid body, morph offsets of missing vertices, ...)
+are dropped.

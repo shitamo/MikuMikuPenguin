@@ -42,6 +42,7 @@ English translation is available in [README.en.md](README.en.md).
 * shaders: PMXViewerのシェーダーがここに入ってます。
 * src: PMXViewerのソースコード（.cpp、.h）がここに入ってます。
 * data: 必要なテクスチャ等が入ってます。
+* test: テスト。test/regress は読み込みの回帰テスト用の壊れたファイル、test/fuzz はファズターゲットです。
 
 ## 依存ライブラリ
 
@@ -65,4 +66,37 @@ PMXViewer（PMX/PMDモデル対応）には libmmp と stb_image（libstb）が�
 
 音楽再生や操作パネルを無効にするには `meson setup build -Dsound=disabled -Dgui=disabled` とします。
 Debian パッケージは `dpkg-buildpackage -us -uc -b` で作れます。
+
+`meson test` には、壊れた／悪意のある PMX・PMD・VMD を読み込ませる回帰テスト（test/regress）も
+含まれます。メモリエラーまで検出するには、サニタイザ付きでビルドして実行します：
+
+    $ meson setup build-asan -Db_sanitize=address,undefined
+    $ meson test -C build-asan
+
+## ファジング
+
+PMX・PMD・VMD の読み込み処理には libFuzzer 用のファズターゲットがあります（test/fuzz）。
+読み込んだ後、モーションの再生（モーフ、IK、付与）と物理演算の初期化・数ステップの計算も行います
+（OpenGL はダミーの関数に置き換えます）。clang と `-Dfuzz=true` でビルドします：
+
+    $ sudo apt install clang libclang-rt-dev     # Debian/Ubuntu
+    $ CC=clang CXX=clang++ meson setup build-fuzz -Dfuzz=true -Dgui=disabled -Dsound=disabled
+    $ meson compile -C build-fuzz fuzz_pmx fuzz_pmd fuzz_vmd
+
+種ファイルは test/fuzz/seeds にあります（`python3 test/fuzz/make_seeds.py` で生成した小さなテスト用のファイル）。
+コーパス用のディレクトリを作り、種をコピーしてから実行します：
+
+    $ mkdir -p corpus/pmx && cp test/fuzz/seeds/pmx/* corpus/pmx/
+    $ build-fuzz/test/fuzz/fuzz_pmx corpus/pmx -max_total_time=3600 -timeout=10 \
+          -rss_limit_mb=2048 -malloc_limit_mb=512 -max_len=16384
+
+`fuzz_pmd`・`fuzz_vmd` も同様です（種は test/fuzz/seeds/pmd、test/fuzz/seeds/vmd）。複数のコアで回すには
+`-fork=N`（クラッシュしても続けるには `-ignore_crashes=1` も）を付けます。見つかった入力（crash-*）は
+`build-fuzz/test/fuzz/fuzz_pmx crash-…` で再現でき、直したら小さくした再現ファイルを test/regress に加えてください
+（`python3 test/regress/make_regress.py` が既存の回帰ファイルを生成します。`*.reject.*` という名前のファイルは
+読み込みエラーになるべきもの、それ以外は読み込めるべきものです）。
+
+読み込み失敗は `std::runtime_error` で知らされます。範囲外のインデックスは読み込み時に検査され、
+任意の参照（テクスチャ、ボーン、表示枠など）は「なし」に直し、使えない要素（剛体のないジョイント、
+存在しない頂点のモーフ等）は取り除きます。
 

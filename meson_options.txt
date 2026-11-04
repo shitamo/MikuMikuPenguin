@@ -2,3 +2,5 @@ option('gui', type : 'feature', value : 'auto',
   description : 'On-screen playback controls and settings (Dear ImGui)')
 option('sound', type : 'feature', value : 'auto',
   description : 'Music playback with -s (SDL3_mixer, or SDL2_mixer as a fallback)')
+option('fuzz', type : 'boolean', value : false,
+  description : 'Build the libFuzzer targets in test/fuzz (needs clang: CXX=clang++)')
