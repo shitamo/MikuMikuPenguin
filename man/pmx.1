@@ -1,9 +1,12 @@
-.TH PMX "1" "October 2026" "PMXViewer v0.2.1+GLFW3.2" "User Commands"
+.TH PMX "1" "November 2026" "PMXViewer v0.2.1+GLFW3.3" "User Commands"
 .SH NAME
 pmx \- MikuMikuDance PMX/PMD model / VMD motion viewer (MikuMikuPenguin)
 .SH SYNOPSIS
 .B pmx
 [\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] [\fB\-\-loop\fR] [\fB\-\-no\-gui\fR] {\fImodel.pmx\fR|\fImodel.pmd\fR} [\fImotion.vmd\fR] [\fB\-\-pos\fR \fIX,Y,Z\fR] [\fImodel2\fR [\fImotion2.vmd\fR] ...]
+.br
+.B pmx
+\fB\-\-render\fR \fIoutput\fR [\fB\-\-range\fR \fIstart\fR:\fIend\fR] [\fB\-\-size\fR \fIW\fRx\fIH\fR] [\fB\-\-fps\fR 30|60] [\fB\-\-no\-music\fR] [\fB\-s\fR \fImusic\fR] [\fB\-c\fR \fIcamera.vmd\fR] [\fB\-l\fR \fIlight.vmd\fR] \fImodel\fR [\fImotion.vmd\fR] ...
 .SH DESCRIPTION
 .B pmx
 (PMXViewer) is a demonstration program for the MikuMikuPenguin library
@@ -28,6 +31,11 @@ dropping them onto the window (PMX/PMD = add a model, VMD = motion for the
 first model without one, or camera/light motion when the VMD has no bone or
 morph keys, other files = music).  Without file arguments the viewer starts
 empty.
+.PP
+\fBFile\fR \(-> \fBExport video...\fR writes a video from the window (see
+\fB\-\-render\fR): a dialog asks for the range, size, frame rate, output
+file and format, then shows the progress and the frame being written, with
+a button to stop.
 .SH OPTIONS
 .TP
 \fB\-\-pos\fR \fIX,Y,Z\fR
@@ -36,7 +44,8 @@ settings panel).
 .TP
 \fB\-s\fR \fIfile\fR
 Play a music file along with the VMD motion.
-Only formats supported by SDL2_mixer are accepted.
+Only formats supported by SDL_mixer are accepted.  With \fB\-\-render\fR the
+music is put into the video instead (any format ffmpeg reads).
 .TP
 \fB\-c\fR \fIfile\fR
 Camera motion (a VMD file with camera frames).  Without this option the
@@ -52,6 +61,41 @@ reached.
 .TP
 \fB\-\-no\-gui\fR
 Start with the on-screen controls hidden (\fBTab\fR shows them).
+.TP
+\fB\-\-render\fR \fIfile\fR
+Video output (like MMD's AVI output): draw the motion frame by frame into
+\fIfile\fR without showing a window, then exit.  A name ending in
+\fI.png\fR (\fIout.png\fR gives \fIout_00000.png\fR, \fIout_00001.png\fR, ...;
+a printf format such as \fIout_%04d.png\fR is also accepted) or a directory
+(an existing one, or a name ending in \fB/\fR) is written as numbered PNG
+files.  Other names (\fI.mp4\fR, \fI.webm\fR, \fI.mkv\fR, \fI.mov\fR,
+\fI.avi\fR, \fI.gif\fR, ...) are encoded by
+.BR ffmpeg (1),
+which reads raw frames from a pipe; the extension selects the format.  The
+music given with \fB\-s\fR is included, starting at the first frame of the
+range.
+.IP
+Time advances by frames, not by the clock: each frame moves the animation
+and the physics on by exactly 1/30 or 1/60 second (the physics in 1/60 s
+steps).  When the range does not start at frame 0, the motion and the
+physics are first run from frame 0 to the start, so the result looks as
+when played from the beginning.  Camera and light motion, the shadows and
+all models are drawn as on screen; the on-screen controls are not.  An X
+display is still needed (for example \fBxvfb-run pmx \-\-render ...\fR).
+.TP
+\fB\-\-range\fR \fIstart\fR:\fIend\fR
+VMD frames (30 per second) to write, both included; the output lasts
+(\fIend\fR\-\fIstart\fR+1)/30 seconds.  Default: from 0 to the last key of
+the motion.  Either number may be left out (\fB300:\fR, \fB:899\fR).
+.TP
+\fB\-\-size\fR \fIW\fRx\fIH\fR
+Size of the video in pixels (default 1280x720).  Videos use even sizes.
+.TP
+\fB\-\-fps\fR 30|60
+Frame rate of the video (default 30).
+.TP
+\fB\-\-no\-music\fR
+Do not put the \fB\-s\fR music into the video.
 .TP
 \fB\-\-help\fR
 display help and exit
@@ -118,6 +162,13 @@ reset the camera (front view framing the whole model)
 .TP
 .B Esc
 quit
+.SH EXAMPLES
+.TP
+.B pmx \-\-render dance.mp4 \-s song.wav \-c camera.vmd miku.pmx dance.vmd
+the whole dance with music as an H.264 video (1280x720, 30 fps)
+.TP
+.B pmx \-\-render frames/ \-\-range 300:449 \-\-size 1920x1080 \-\-fps 60 miku.pmx dance.vmd
+five seconds as 300 PNG files frames/00000.png ... frames/00299.png
 .SH FILES
 .TP
 .I /usr/share/mikumikupenguin/shaders/

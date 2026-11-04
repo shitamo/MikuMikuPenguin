@@ -1,3 +1,19 @@
+November 4, 2026 (video output, version 0.2.1+GLFW3.3):
+-Video output like MMD's "AVI output": pmx --render FILE [--range A:B]
+ [--size WxH] [--fps 30|60] [--no-music] renders without showing the window
+ (hidden GLFW window + multisampled FBO, no GUI) and quits when done.
+ FILE.png / FILE_%04d.png / a directory: numbered PNG files (stb_image_write);
+ other extensions (mp4, webm, mkv, mov, avi, gif ...): raw RGB frames piped
+ into ffmpeg, which also muxes the -s music from the start of the range
+-Time advances by frames, not by the clock: 1 or 2 steps of 1/60 s
+ (animation and physics) per frame; a range not starting at 0 is run from
+ frame 0 first so that the physics matches continuous playback. Camera and
+ light motion, shadows and all models are drawn as on screen
+-GUI: File > Export video... (range with "from here", size presets, 30/60
+ fps, output path and format, music on/off), progress dialog with the frame
+ being written and a stop button; playback position is restored afterwards
+-man page, --help and README updated
+
 October 11, 2026 (texture wrap):
 -Model textures repeat (Direct3D's default WRAP sampler) instead of
  clamping: models with UVs outside [0,1] (e.g. converted from VRM, such as

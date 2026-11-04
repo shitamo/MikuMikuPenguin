@@ -1,3 +1,16 @@
+mikumikupenguin (0.2.1+GLFW3.3) unstable; urgency=medium
+
+  * Video output like MMD's AVI output: pmx --render FILE [--range A:B]
+    [--size WxH] [--fps 30|60] draws the motion frame by frame into an
+    offscreen framebuffer (hidden window, no GUI) and writes numbered PNG
+    files or, through an ffmpeg pipe, a video (mp4, webm, ...) with the -s
+    music starting at the first frame; time advances in exact 1/60 s steps.
+    Also in the window: File > Export video... (range, size, output,
+    progress and stop button).
+  * Suggest ffmpeg (video files) and xvfb (rendering without a display).
+
+ -- shitamo <sitamo@gmail.com>  Wed, 04 Nov 2026 23:30:00 +0900
+
 mikumikupenguin (0.2.1+GLFW3.2) unstable; urgency=medium
 
   * Repeat model textures like MMD (fixes wrong colours of models whose

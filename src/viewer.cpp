@@ -24,6 +24,7 @@
 #include "mmdphysics.h"
 
 #include "sound.h"
+#include "videowriter.h"
 #include <algorithm>
 
 static void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
@@ -58,8 +59,17 @@ static void splitModelPath(const string &path, string &folder, string &file)
 	}
 }
 
-Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cameraPath, string lightPath)
+Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cameraPath, string lightPath, bool offscreenMode)
 {
+	offscreen=offscreenMode;
+	batchRecord=false;
+	recording=recordPreroll=recordRequested=recordCancel=recordFailed=recordCancelled=false;
+	writer=NULL;
+	recFrame=recTotal=0; recStep=2;
+	recStartWall=0.0;
+	recSavedTime=0; recSavedPaused=false;
+	recFBO=recColorRB=recDepthRB=recResolveFBO=recResolveRB=0;
+	drawFBO=0;
 	musicPathShown=musicPath;
 	cameraPathShown=cameraPath;
 	lightPathShown=lightPath;
@@ -93,7 +103,7 @@ Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cam
 	
 	initUniformVarLocations();
 	initShadowMap();
-	initGUI();
+	if(!offscreen) initGUI();
 	
 	MVP_loc = glGetUniformLocation(shaderProgram, "MVP");
 	
@@ -116,7 +126,7 @@ Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cam
 		models.push_back(m);
 	}
 	
-	initSound(musicPath);
+	if(!offscreen) initSound(musicPath); //--render muxes the music with ffmpeg instead
 	
 	//Initialize timer variables
 	startTime = glfwGetTime();
@@ -426,7 +436,7 @@ glm::mat4 Viewer::modelMatrixFor(const SceneModel &m) const
 bool Viewer::modelShown(const SceneModel &m) const
 {
 	//A hides the models; so does the VMD "表示" (show) flag
-	return showModel && m.visible && (guiCapturesKeyboard || glfwGetKey(window, GLFW_KEY_A)!=GLFW_PRESS) && m.motionController->isModelVisible();
+	return showModel && m.visible && (recording || guiCapturesKeyboard || glfwGetKey(window, GLFW_KEY_A)!=GLFW_PRESS) && m.motionController->isModelVisible();
 }
 
 void Viewer::updateSceneBounds()
@@ -581,8 +591,10 @@ void Viewer::fpsCount()
 	}
 }
 
-void Viewer::run()
+int Viewer::run()
 {
+	if(batchRecord) return runBatchRecord();
+	
 	//The animation and the physics advance in fixed 1/60 s steps.  Step them
 	//according to the elapsed wall-clock time so that playback speed does
 	//not depend on the monitor refresh rate (e.g. 120/144 Hz with vsync) or
@@ -606,6 +618,37 @@ void Viewer::run()
 		fpsCount();
 		handleEvents();
 		
+		//***Video output from the GUI: frames are rendered offscreen for up
+		//to 1/20 s, then the last one is shown with the progress dialog
+		if(recordRequested)
+		{
+			recordRequested=false;
+			string err;
+			if(!startRecording(recordRequest, err)) loadError=err;
+		}
+		if(recording)
+		{
+			double t0=glfwGetTime();
+			do
+			{
+				if(recordCancel) { finishRecording(true); break; }
+				if(!recordNextFrame()) break;
+			} while(recording && glfwGetTime()-t0<0.05);
+			if(recording) drawRecordPreview();
+			else
+			{
+				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+				glViewport(0, 0, framebufferWidth, framebufferHeight);
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+				render();
+			}
+			guiRender();
+			glfwSwapBuffers(window);
+			lastTime=glfwGetTime();
+			accumulator=0.0;
+			continue;
+		}
+		
 		int steps=0;
 		while(accumulator>=STEP && steps<MAX_STEPS_PER_FRAME)
 		{
@@ -623,6 +666,7 @@ void Viewer::run()
 		
 		glfwSwapBuffers(window);
 	}
+	return 0;
 }
 
 void Viewer::setCamera()
@@ -974,7 +1018,7 @@ void Viewer::renderShadowMap(const glm::mat4 &lightVP)
 	}
 	
 	glDisable(GL_POLYGON_OFFSET_FILL);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, drawFBO);
 	glViewport(0, 0, framebufferWidth, framebufferHeight);
 }
 
@@ -1281,6 +1325,8 @@ void Viewer::initGLFW()
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //Don't want old OpenGL
 	glfwWindowHint(GLFW_DEPTH_BITS, 32);
 	glfwWindowHint(GLFW_STENCIL_BITS, 8); //ground shadow (draw each pixel once)
+	//--render draws into a framebuffer object; the window is only for the context
+	glfwWindowHint(GLFW_VISIBLE, offscreen ? GLFW_FALSE : GLFW_TRUE);
 	
 	//Open a window and create its OpenGL context
 	window = glfwCreateWindow(1280, 720, "PMX Viewer", NULL, NULL);
@@ -1297,7 +1343,7 @@ void Viewer::initGLFW()
 		exit(EXIT_FAILURE);
 	}
 	glfwMakeContextCurrent(window);
-	glfwSwapInterval(1);
+	glfwSwapInterval(offscreen ? 0 : 1);
 	glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
 
 	//GL entry points are resolved by libepoxy on first use; nothing to initialise.
@@ -1327,7 +1373,7 @@ void Viewer::initGLFW()
 
 bool Viewer::keyPressed(int key)
 {
-	if(guiCapturesKeyboard) return false;
+	if(guiCapturesKeyboard || recording) return false;
 	return glfwGetKey(window, key)==GLFW_PRESS;
 }
 
@@ -1399,6 +1445,7 @@ void Viewer::initUniformVarLocations()
 
 Viewer::~Viewer()
 {
+	if(recording) finishRecording(true);
 	shutdownGUI();
 	if(window) glfwDestroyWindow(window);
 	glfwTerminate();
@@ -1507,12 +1554,14 @@ void Viewer::stepFrame(int direction)
 void Viewer::handleEvents()
 {
 	glfwPollEvents();
-	//loads requested in the previous frame (the GUI has shown "loading")
-	processPendingLoads();
+	//loads requested in the previous frame (the GUI has shown "loading");
+	//they wait while a video is written
+	if(!recording) processPendingLoads();
 	for(const std::string &f : droppedFiles) pendingLoads.push_back(PendingLoad{PendingLoad::Auto, f, -1});
 	droppedFiles.clear();
-	if(!guiAvailable) processPendingLoads(); //no "loading" message to show first
+	if(!guiAvailable && !recording) processPendingLoads(); //no "loading" message to show first
 	guiFrame();
+	if(recording) { keyEvents.clear(); return; } //no playback control while writing a video
 	if(keyPressed(GLFW_KEY_R))
 	{
 		resetCamera();
