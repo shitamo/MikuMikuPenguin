@@ -47,7 +47,7 @@ The build uses Meson and Ninja (replaced autotools in the 2026 update):
 
     $ meson setup build
     $ meson compile -C build
-    $ meson test -C build        # unit tests
+    $ meson test -C build        # tests (see below)
 
 To install libmmp and PMXViewer on your system, run:
 
@@ -55,6 +55,22 @@ To install libmmp and PMXViewer on your system, run:
 
 Use `meson setup build -Dsound=disabled -Dgui=disabled` to build without music playback or on-screen controls.
 A Debian package can be built with `dpkg-buildpackage -us -uc -b`.
+
+## Tests
+
+`meson test -C build` runs the tests (GitHub Actions also runs them on every push and pull request).
+The test model and motions are generated into the build directory by `test/gen_testdata.py` (needs Python 3).
+
+* suite `unit`: PMX / PMD / VMD loading (including broken files), bone, morph, camera and light interpolation, seeking against normal playback, the order of IK and inheritance
+* suite `render`: `pmx --snapshot FRAME OUT.png` draws fixed frames, which are compared with the reference images in `test/reference/` (small differences are tolerated).
+  Without an X display Xvfb is started; Mesa software rendering (`LIBGL_ALWAYS_SOFTWARE=1`) is used. Without Xvfb the test is skipped.
+
+Run one suite with e.g. `meson test -C build --suite unit`. After an intended change of the rendering, regenerate the reference images with
+
+    $ meson compile -C build update-reference-images
+
+and check `test/reference/*.png` before committing them.
+The images and diffs (differing pixels in red) of a failed run are kept in `build/test/render/`.
 
 `meson test` includes loader regression tests that feed broken / hostile PMX, PMD and VMD files to
 libmmp (test/regress).  To catch memory errors too, run them in a sanitizer build:

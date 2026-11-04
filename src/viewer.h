@@ -71,18 +71,33 @@ struct SceneModel
 };
 
 
+//! Window settings (the defaults are the interactive viewer)
+struct ViewerOptions
+{
+	int width, height; //!< window size
+	bool hidden;       //!< do not show the window (snapshots)
+	bool multisample;  //!< 4x MSAA (off for snapshots, which must be reproducible)
+	ViewerOptions(): width(1280), height(720), hidden(false), multisample(true) {}
+};
+
 class Viewer
 {
 	public:
-	Viewer(const std::vector<ModelSpec> &modelSpecs, std::string musicPath="", std::string cameraPath="", std::string lightPath="");
+	Viewer(const std::vector<ModelSpec> &modelSpecs, std::string musicPath="", std::string cameraPath="", std::string lightPath="",
+	       const ViewerOptions &options=ViewerOptions());
 	~Viewer();
 	
 	void run();
+	/*! Play from the beginning to VMD frame `frame` (30 fps, with physics,
+	 *  in the same 1/60 s steps as run()), draw that one frame without the
+	 *  GUI and save it as a PNG.  Returns false if the file cannot be written. */
+	bool snapshot(int frame, const std::string &pngPath);
 	void setLoop(bool loop) { loopPlayback=loop; } //!< restart from the beginning at the end of the motion
 	void setGUI(bool enable) { guiVisible=enable; } //!< show the on-screen controls
 		
 	
 	private:
+	ViewerOptions options;
 	void initGLFW();
 	void hackShaderFiles(); //modify #version lines in shader files to match GL version
 	void bindAttribLocations(); //before linking the shader program

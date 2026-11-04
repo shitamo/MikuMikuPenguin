@@ -1,4 +1,4 @@
-.TH PMX "1" "November 2026" "PMXViewer v0.2.1+GLFW3.3" "User Commands"
+.TH PMX "1" "November 2026" "PMXViewer v0.2.1+GLFW3.4" "User Commands"
 .SH NAME
 pmx \- MikuMikuDance PMX/PMD model / VMD motion viewer (MikuMikuPenguin)
 .SH SYNOPSIS
@@ -52,6 +52,15 @@ reached.
 .TP
 \fB\-\-no\-gui\fR
 Start with the on-screen controls hidden (\fBTab\fR shows them).
+.TP
+\fB\-\-size\fR \fIWIDTH\fRx\fIHEIGHT\fR
+Window size (default 1280x720).
+.TP
+\fB\-\-snapshot\fR \fIFRAME\fR \fIfile.png\fR
+Play the motion from the beginning to VMD frame \fIFRAME\fR (30 frames per
+second, with physics), save that frame as a PNG image and exit.  The window
+is not shown and the on-screen controls are not drawn; music is not played.
+Used by the rendering test.
 .TP
 \fB\-\-help\fR
 display help and exit

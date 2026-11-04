@@ -1,3 +1,30 @@
+November 4, 2026 (tests, version 0.2.1+GLFW3.4):
+-Automated tests, run by "meson test" and by GitHub Actions on every push
+ and pull request (.github/workflows/ci.yml):
+ * test/gen_testdata.py writes a small PMX/PMD model (bones, IK, rotation and
+   translation inheritance, vertex/UV/bone/material/group morphs, rigid
+   bodies, a joint, a texture) and VMD motions (Bezier curves, morphs,
+   show/IK, camera with a cut, light, self shadow) into the build directory
+ * loader: counts and values of the PMX, PMD and VMD files, coordinate
+   conversion, VMD write/read, and broken files (missing, wrong header,
+   wrong version, huge counts, cut at every byte) must throw
+ * motion: Bezier curves, bone/morph/camera/light interpolation, seeking
+   (setTime) gives the same pose as playing, IK, inheritance and the
+   deformation order (IK under an inheriting bone of a lower level)
+ * render: pmx --snapshot draws fixed frames under Xvfb with Mesa software
+   rendering; they are compared with test/reference/*.png allowing small
+   differences ("meson compile -C build update-reference-images" makes new
+   reference images)
+-pmx: --snapshot FRAME OUT.png (play to the frame with physics, save it as a
+ PNG and exit, without window or GUI) and --size WxH
+-Fixed the pose on keyframes: bezier() returned 1 instead of 0 at the start
+ of a curve, so the first frame and seeking exactly onto a key showed the
+ pose of the next key (bones and camera). Slerp() returns the key rotations
+ exactly at 0 and 1 so that a key looks the same whether it was played or
+ sought to
+-libmmp: VMDMotionController can be created with shader program 0 to
+ evaluate the animation without an OpenGL context
+
 November 4, 2026 (robust loaders, version 0.2.1+GLFW3.3):
 -The PMX, PMD and VMD loaders no longer crash, hang or allocate huge
  amounts of memory on broken or hostile files (found with libFuzzer):

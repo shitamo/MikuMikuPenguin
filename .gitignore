@@ -33,6 +33,7 @@ Makefile.in
 /debian/libmmp-dev/
 /debian/tmp/
 /debian/build/
+/obj-*/
 
 #ignore data folder
 data/model/

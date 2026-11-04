@@ -45,6 +45,9 @@ class VMDMotionController
 	 * @param shaderProgram Uniform変数「Bones」を取得出来るシェーダープログラム。
 	 * \endif
 	*/
+	//! shaderProgram 0: no OpenGL at all (no context needed; for tests and
+	//! tools that only evaluate the animation).  The pose is then available
+	//! from the bones (calculateGlobalMatrix()), skinMatrix and vertexData.
 	VMDMotionController(ClosedMMDFormat::PMXInfo &pmxInfo,ClosedMMDFormat::VMDInfo &vmdInfo,GLuint shaderProgram);			
 	~VMDMotionController();
 	void updateVertexMorphs(); 			//!< \if ENGLISH \brief A function used to update the Vertices of a model based on Vertex Morph animation parameters. \endif
@@ -141,6 +144,7 @@ class VMDMotionController
 	ClosedMMDFormat::VMDInfo &vmdInfo;
 	
 	private:
+	bool useGL; //false when constructed with shaderProgram 0
 	GLuint Bones_loc; //uniform location of the boneTexture sampler in the shader
 	GLuint boneBuffer; //GL_TEXTURE_BUFFER holding skinMatrix[]
 	GLuint vertexBuffer; //model vertex buffer (GL_ARRAY_BUFFER bound at construction)
