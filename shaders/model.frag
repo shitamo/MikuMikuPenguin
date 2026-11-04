@@ -34,6 +34,11 @@ uniform bool selfShadow;          //this material receives the self shadow
 uniform sampler2DShadow shadowMap;
 uniform vec2 shadowTexelSize;
 
+//glow (AutoLuminous-like, only with the screen effects): bit 1 materials
+//with specular power >= 110 emit light, bit 2 the brightest parts glow
+uniform int glowMode;
+uniform float glowThreshold;
+
 //material morph texture coefficients: tex = tex*textureMul + textureAdd
 uniform vec4 textureMul;
 uniform vec4 textureAdd;
@@ -56,6 +61,7 @@ in vec3 viewPos;
 in vec4 shadowCoord;
 
 out vec4 color;
+out vec4 glow;   //emitted light (second colour buffer of the effects framebuffer)
 
 //fraction of light reaching this point (1 = lit), 3x3 PCF
 float shadowVisibility(vec3 N, vec3 L)
@@ -71,8 +77,24 @@ float shadowVisibility(vec3 N, vec3 L)
 	return sum / 9.0;
 }
 
+//light emitted by the surface with the final colour c
+vec3 emission(vec3 base, vec3 c)
+{
+	vec3 e = vec3(0.0);
+	//AutoLuminous convention: specular power from 110 makes a material glow
+	if((glowMode & 1) != 0 && shininess >= 110.0)
+		e += base * min((shininess - 100.0) / 20.0, 5.0);
+	if((glowMode & 2) != 0)
+	{
+		float l = dot(c, vec3(0.299, 0.587, 0.114));
+		e += c * smoothstep(glowThreshold, 1.0, l);
+	}
+	return e;
+}
+
 void main()
 {
+	glow = vec4(0.0, 0.0, 0.0, 1.0);
 	if(renderMode == 1) //depth only
 	{
 		color = vec4(1.0);
@@ -81,6 +103,7 @@ void main()
 	if(renderMode == 2)
 	{
 		color = groundShadowColor;
+		glow = vec4(0.0, 0.0, 0.0, groundShadowColor.a);
 		return;
 	}
 	
@@ -104,6 +127,7 @@ void main()
 	c *= tex.rgb;
 	alpha *= tex.a;
 	if(alpha <= 0.0) discard;
+	vec3 base = clamp(diffuse.rgb + ambient, 0.0, 1.0) * tex.rgb; //unlit colour (emission)
 	
 	//sphere map (view-space normal -> UV)
 	int sphereMode = int(fSphereMode + 0.5);
@@ -131,6 +155,7 @@ void main()
 			litC += pow(max(dot(H, N), 0.0), shininess) * specular * lightColor;
 		}
 		color = vec4(clamp(mix(shadowC, litC, comp), 0.0, 1.0), alpha);
+		if(glowMode != 0) glow = vec4(emission(base, color.rgb), alpha);
 		return;
 	}
 	
@@ -149,4 +174,5 @@ void main()
 	}
 	
 	color = vec4(clamp(c, 0.0, 1.0), alpha);
+	if(glowMode != 0) glow = vec4(emission(base, color.rgb), alpha);
 }

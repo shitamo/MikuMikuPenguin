@@ -77,6 +77,7 @@ Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cam
 	endTime=0;
 	useCameraMotion=false;
 	useLightMotion=false;
+	focusDistance=45.0f;
 	
 	//***Read the files given on the command line (before opening the window,
 	//so that errors appear quickly; a broken file is fatal here)
@@ -93,6 +94,7 @@ Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cam
 	
 	initUniformVarLocations();
 	initShadowMap();
+	postfx.init(shaderDir);
 	initGUI();
 	
 	MVP_loc = glGetUniformLocation(shaderProgram, "MVP");
@@ -502,6 +504,9 @@ void Viewer::seekTo(int t)
 void Viewer::render()
 {
 	glUseProgram(shaderProgram);
+	//emitted light goes to the effects' second colour buffer (glow only)
+	glUniform1i(uniformVars[uGlowMode], postfx.glowMode());
+	glUniform1f(uniformVars[uGlowThreshold], postfx.settings.glowThreshold);
 	bool anyShown=false;
 	for(SceneModel *m : models) anyShown = anyShown || modelShown(*m);
 	if(anyShown)
@@ -540,6 +545,7 @@ void Viewer::render()
 	                                btIDebugDraw::DBG_DrawConstraints, btIDebugDraw::DBG_DrawConstraintLimits};
 	if(debugMode>0 && debugMode<5)
 	{
+		postfx.sceneColorOnly(); //the debug shader has no glow output
 		for(SceneModel *m : models)
 		{
 			glUseProgram(m->bulletPhysics->debugDrawer->shaderProgram);
@@ -618,7 +624,17 @@ void Viewer::run()
 		{
 			updateCameraUniforms();
 		}
+		//with screen effects the scene goes into an offscreen buffer first
+		bool effects=postfx.beginScene(framebufferWidth, framebufferHeight, glm::vec4(1.0f));
 		render();
+		if(effects)
+		{
+			PostEffects::FrameInfo frame;
+			frame.projection=projectionMatrix;
+			frame.focusDistance=focusDistance;
+			postfx.endScene(frame);
+			glUseProgram(shaderProgram);
+		}
 		guiRender();
 		
 		glfwSwapBuffers(window);
@@ -642,6 +658,7 @@ void Viewer::setCamera()
 			projectionMatrix = glm::ortho(-h*aspect, h*aspect, -h, h, -5000.0f, 5000.0f);
 		}
 		viewMatrix = cam.viewMatrix();
+		focusDistance = std::max(std::abs(cam.distance), 0.01f);
 		return;
 	}
 	
@@ -649,6 +666,7 @@ void Viewer::setCamera()
 	float nearPlane = glm::max(radius*0.01f, 0.01f);
 	float farPlane  = radius*20.0f + glm::length(modelMax-modelMin)*4.0f;
 	projectionMatrix = glm::perspective(glm::radians(30.0f), aspect, nearPlane, farPlane);
+	focusDistance = radius; //the orbit centre
 	// Camera matrix: orbit around cameraTarget
 	viewMatrix = glm::lookAt(
 		cameraTarget + glm::vec3(cameraPosition.x,cameraPosition.y,-cameraPosition.z),
@@ -974,7 +992,7 @@ void Viewer::renderShadowMap(const glm::mat4 &lightVP)
 	}
 	
 	glDisable(GL_POLYGON_OFFSET_FILL);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, postfx.sceneFramebuffer());
 	glViewport(0, 0, framebufferWidth, framebufferHeight);
 }
 
@@ -991,7 +1009,9 @@ void Viewer::drawGroundShadow(const glm::vec3 &lightDir)
 	
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
-	glDepthMask(GL_FALSE);
+	//with screen effects the shadow writes the floor's depth, so that depth
+	//of field and SSAO treat it as the floor rather than the far background
+	glDepthMask(postfx.sceneFramebuffer()!=0 ? GL_TRUE : GL_FALSE);
 	glDisable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1026,6 +1046,8 @@ void Viewer::bindAttribLocations()
 	glBindAttribLocation(shaderProgram, vSdefC, "vSdefC");
 	glBindAttribLocation(shaderProgram, vSdefR0, "vSdefR0");
 	glBindAttribLocation(shaderProgram, vSdefR1, "vSdefR1");
+	glBindFragDataLocation(shaderProgram, 0, "color");
+	glBindFragDataLocation(shaderProgram, 1, "glow"); //screen effects (glow)
 }
 
 void Viewer::initBuffers(SceneModel &m)
@@ -1244,10 +1266,12 @@ void Viewer::hackShaderFiles()
 	if(!test.is_open())
 	{
 		shaderProgram=compileShaders(DATA_PATH"/shaders/model.vert",DATA_PATH"/shaders/model.frag");
+		shaderDir=DATA_PATH"/shaders";
 	}
 	else
 	{
 		shaderProgram=compileShaders("shaders/model.vert","shaders/model.frag");
+		shaderDir="shaders";
 	}
 	test.close();
 	
@@ -1395,11 +1419,14 @@ void Viewer::initUniformVarLocations()
 	uniformVars[uSphereAdd]=glGetUniformLocation(shaderProgram,"sphereAdd");
 	uniformVars[uToonMul]=glGetUniformLocation(shaderProgram,"toonMul");
 	uniformVars[uToonAdd]=glGetUniformLocation(shaderProgram,"toonAdd");
+	uniformVars[uGlowMode]=glGetUniformLocation(shaderProgram,"glowMode");
+	uniformVars[uGlowThreshold]=glGetUniformLocation(shaderProgram,"glowThreshold");
 }
 
 Viewer::~Viewer()
 {
 	shutdownGUI();
+	postfx.release();
 	if(window) glfwDestroyWindow(window);
 	glfwTerminate();
 }

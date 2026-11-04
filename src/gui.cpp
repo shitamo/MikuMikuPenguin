@@ -485,6 +485,92 @@ void Viewer::guiFrame()
 						useCameraMotion=false;
 					}
 				}
+				if(ImGui::CollapsingHeader(T("Effects", "エフェクト")))
+				{
+					EffectSettings &fx=postfx.settings;
+					const float sliderWidth=ImGui::CalcTextSize("00000000000000").x;
+					auto slider=[&](const char *label, float *v, float lo, float hi, const char *fmt="%.2f")
+					{
+						ImGui::SetNextItemWidth(sliderWidth);
+						ImGui::SliderFloat(label, v, lo, hi, fmt);
+					};
+					//one block per effect: on/off, then its settings while it is on
+					auto effect=[&](const char *label, bool *on, const char *tip)
+					{
+						ImGui::Checkbox(label, on);
+						if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);
+						return *on;
+					};
+					if(postfx.failed())
+					{
+						ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.4f, 1.0f), "%s", T("Effects are not available:", "エフェクトを使えません:"));
+						ImGui::TextWrapped("%s", postfx.error().c_str());
+					}
+					ImGui::PushID("effects");
+					if(effect(T("Bloom", "ブルーム"), &fx.bloom, T("Bright parts bleed into their surroundings", "明るい部分がにじみます")))
+					{
+						ImGui::Indent();
+						slider(T("Intensity##bloom", "強さ##bloom"), &fx.bloomIntensity, 0.0f, 3.0f);
+						slider(T("Threshold##bloom", "しきい値##bloom"), &fx.bloomThreshold, 0.0f, 0.99f);
+						slider(T("Spread##bloom", "広がり##bloom"), &fx.bloomRadius, 0.0f, 1.0f);
+						ImGui::Unindent();
+					}
+					if(effect(T("Glow (AutoLuminous-like)", "発光 (AutoLuminous風)"), &fx.glow,
+					          T("Materials with specular power 110 or more emit light", "反射強度が 110 以上の材質が光ります")))
+					{
+						ImGui::Indent();
+						slider(T("Intensity##glow", "強さ##glow"), &fx.glowIntensity, 0.0f, 5.0f);
+						ImGui::Checkbox(T("Bright parts glow too", "高輝度部分も光らせる"), &fx.glowBright);
+						if(fx.glowBright) slider(T("Threshold##glow", "しきい値##glow"), &fx.glowThreshold, 0.0f, 0.99f);
+						ImGui::Unindent();
+					}
+					if(effect(T("Depth of field", "被写界深度"), &fx.dof, T("Blur away from the focus distance", "ピント位置から離れた所をぼかします")))
+					{
+						ImGui::Indent();
+						ImGui::Checkbox(T("Focus on the camera's point of interest", "カメラの注視点にピントを合わせる"), &fx.dofAutoFocus);
+						if(fx.dofAutoFocus)
+						{
+							ImGui::TextDisabled("%s %.1f", T("Focus distance:", "ピント位置:"), focusDistance);
+						}
+						else
+						{
+							ImGui::SetNextItemWidth(sliderWidth);
+							ImGui::DragFloat(T("Focus distance", "ピント位置"), &fx.dofFocus, 0.1f, 0.1f, 1000.0f, "%.1f");
+							ImGui::SameLine();
+							if(ImGui::SmallButton(T("Current", "現在の注視点"))) fx.dofFocus=focusDistance;
+						}
+						slider(T("Strength##dof", "ぼけの強さ##dof"), &fx.dofStrength, 0.0f, 10.0f);
+						slider(T("Max blur##dof", "最大ぼけ量##dof"), &fx.dofMaxBlur, 0.1f, 3.0f);
+						ImGui::Unindent();
+					}
+					if(effect(T("SSAO", "SSAO (物陰を暗く)"), &fx.ssao, T("Darkens creases and places hidden from the open space", "物陰やくぼみを暗くします")))
+					{
+						ImGui::Indent();
+						slider(T("Strength##ssao", "強さ##ssao"), &fx.ssaoStrength, 0.0f, 3.0f);
+						slider(T("Radius##ssao", "半径##ssao"), &fx.ssaoRadius, 0.05f, 5.0f);
+						ImGui::Unindent();
+					}
+					if(effect(T("Colour correction", "色調補正"), &fx.color, T("Brightness, contrast, saturation and gamma", "明るさ・コントラスト・彩度・ガンマ")))
+					{
+						ImGui::Indent();
+						slider(T("Brightness", "明るさ"), &fx.brightness, -0.5f, 0.5f);
+						slider(T("Contrast", "コントラスト"), &fx.contrast, 0.0f, 2.0f);
+						slider(T("Saturation", "彩度"), &fx.saturation, 0.0f, 2.0f);
+						slider(T("Gamma", "ガンマ"), &fx.gamma, 0.2f, 3.0f);
+						if(ImGui::SmallButton(T("Reset##color", "リセット##color")))
+						{
+							EffectSettings d;
+							fx.brightness=d.brightness; fx.contrast=d.contrast; fx.saturation=d.saturation; fx.gamma=d.gamma;
+						}
+						ImGui::Unindent();
+					}
+					effect("FXAA", &fx.fxaa, T("Smooths jagged edges", "輪郭のギザギザを滑らかにします"));
+					if(fx.any() && ImGui::Button(T("All effects off", "エフェクトをすべてオフ")))
+					{
+						fx.bloom=fx.glow=fx.dof=fx.ssao=fx.color=fx.fxaa=false;
+					}
+					ImGui::PopID();
+				}
 				if(ImGui::CollapsingHeader(T("Keyboard shortcuts", "ショートカットキー")))
 				{
 					static const char *rowsEn[][2]={

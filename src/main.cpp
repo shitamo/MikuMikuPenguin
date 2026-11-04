@@ -16,6 +16,7 @@
 
 #include <libmmp.h>
 #include "viewer.h"
+#include "effects.h"
 
 #include <strings.h>
 
@@ -42,6 +43,13 @@ void printHelpInfo()
 	<<"  --pos X,Y,Z\tPosition (MMD coordinates) of the model given just before"<<endl
 	<<"  --loop\tRestart from the beginning at the end of the motion"<<endl
 	<<"  --no-gui\tStart with the on-screen controls hidden (Tab shows them)"<<endl
+	<<"  --effect LIST\tScreen effects to turn on, comma separated: bloom, glow"<<endl
+	<<"\t\t(AutoLuminous-like), dof, ssao, color, fxaa, all; NAME=VALUE also sets"<<endl
+	<<"\t\tthe strength (e.g. --effect bloom=1.2,dof)"<<endl
+	<<"  --dof-focus D\tFocus distance of the depth of field (default: the camera's"<<endl
+	<<"\t\tpoint of interest)"<<endl
+	<<"  --color B,C,S,G\tColour correction: brightness, contrast, saturation, gamma"<<endl
+	<<"\t\t(defaults 0,1,1,1)"<<endl
 	<<"  --help\tdisplay this help and exit"<<endl
 	<<"  --version\toutput version information and exit"<<endl<<endl
 	<<"Controls:"<<endl
@@ -78,6 +86,7 @@ int main(int argc, char** argv)
 	string light_file="";
 	bool loop=false;
 	bool gui=true;
+	EffectSettings effects;
 	
 	int count=0;
 	if(argc > 1)
@@ -101,6 +110,31 @@ int main(int argc, char** argv)
 			else if(string(argv[count]) == "--no-gui")
 			{
 				gui=false;
+			}
+			else if(string(argv[count]) == "--effect" || string(argv[count]) == "--effects")
+			{
+				string error;
+				if(count+1>=argc) { cerr<<"--effect needs a list (e.g. bloom,dof)"<<endl; return 1; }
+				if(!parseEffectList(argv[++count], effects, error)) { cerr<<error<<endl; return 1; }
+			}
+			else if(string(argv[count]) == "--color")
+			{
+				string error;
+				if(count+1>=argc) { cerr<<"--color needs brightness,contrast,saturation,gamma"<<endl; return 1; }
+				if(!parseColorAdjust(argv[++count], effects, error)) { cerr<<error<<endl; return 1; }
+			}
+			else if(string(argv[count]) == "--dof-focus")
+			{
+				float d=0.0f;
+				if(count+1>=argc || sscanf(argv[count+1], "%f", &d)!=1 || !(d>0.0f))
+				{
+					cerr<<"--dof-focus needs a distance > 0"<<endl;
+					return 1;
+				}
+				++count;
+				effects.dofFocus=d;
+				effects.dofAutoFocus=false;
+				effects.dof=true;
 			}
 			else if(string(argv[count]) == "--loop")
 			{
@@ -178,6 +212,7 @@ int main(int argc, char** argv)
 		
 		viewer.setLoop(loop);
 		viewer.setGUI(gui);
+		viewer.setEffects(effects);
 		viewer.run();
 	}
 	catch(const std::exception &e)

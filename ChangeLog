@@ -1,3 +1,21 @@
+November 4, 2026 (screen effects):
+-MME-like screen effects done by the viewer itself (no .fx files are read):
+ bloom, glow (AutoLuminous-like: materials with specular power >= 110 emit
+ light, optionally the brightest parts too), depth of field (focus on the
+ camera's point of interest or a fixed distance), SSAO, colour correction
+ (brightness, contrast, saturation, gamma) and FXAA
+-With an effect on, the scene is drawn into a floating point offscreen
+ framebuffer (multisampled like the window, depth/stencil, a second colour
+ buffer for emitted light) and processed by full-screen passes; SSAO, DoF
+ blur and bloom run at half size or below. With all effects off (the
+ default) nothing changes: the scene is drawn directly into the window
+-"Effects" section in the settings panel; --effect LIST (bloom, glow, dof,
+ ssao, color, fxaa, all, none; NAME=VALUE sets the strength), --dof-focus D
+ and --color B,C,S,G options
+-The ground shadow writes the floor depth while effects are on, so that DoF
+ and SSAO see the floor
+-Version 0.2.1+GLFW3.3
+
 October 11, 2026 (texture wrap):
 -Model textures repeat (Direct3D's default WRAP sampler) instead of
  clamping: models with UVs outside [0,1] (e.g. converted from VRM, such as

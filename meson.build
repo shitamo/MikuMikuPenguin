@@ -1,5 +1,5 @@
 project('mikumikupenguin', 'cpp',
-  version : '0.2.1+GLFW3.2',
+  version : '0.2.1+GLFW3.3',
   license : 'GPL-3.0-only',
   meson_version : '>= 0.60.0',
   default_options : [
@@ -155,6 +155,8 @@ pmx_sources = [
   'src/viewer.cpp',
   'src/glfw_func_callbacks.cpp',
   'src/gui.cpp',
+  'src/effects.cpp',
+  'src/postfx.cpp',
 ]
 if sound_backend != 'none'
   pmx_sources += 'src/sound.cpp'
@@ -173,6 +175,14 @@ install_data('shaders/model.vert', 'shaders/model.frag',
              'shaders/bulletDebug.vert', 'shaders/bulletDebug.frag',
   install_dir : pkgdatadir / 'shaders')
 install_data(
+  'shaders/postfx/fullscreen.vert',
+  'shaders/postfx/ssao.frag', 'shaders/postfx/ssao_blur.frag',
+  'shaders/postfx/dof_prefilter.frag', 'shaders/postfx/dof_blur.frag',
+  'shaders/postfx/bloom_prefilter.frag', 'shaders/postfx/bloom_down.frag',
+  'shaders/postfx/bloom_up.frag', 'shaders/postfx/composite.frag',
+  'shaders/postfx/fxaa.frag',
+  install_dir : pkgdatadir / 'shaders' / 'postfx')
+install_data(
   'data/share/toon01.bmp', 'data/share/toon02.bmp', 'data/share/toon03.bmp',
   'data/share/toon04.bmp', 'data/share/toon05.bmp', 'data/share/toon06.bmp',
   'data/share/toon07.bmp', 'data/share/toon08.bmp', 'data/share/toon09.bmp',
@@ -186,6 +196,9 @@ install_man('man/pmx.1')
 glm_helper_test = executable('glm_helper_test', 'test/glm_helper_test.cpp',
   dependencies : libmmp_dep)
 test('glm_helper', glm_helper_test)
+effects_test = executable('effects_test', 'test/effects_test.cpp', 'src/effects.cpp',
+  include_directories : include_directories('src'))
+test('effects', effects_test)
 
 summary({
   'C++ standard' : get_option('cpp_std'),
