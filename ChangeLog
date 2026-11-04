@@ -1,3 +1,33 @@
+November 4, 2026 (tests): version 0.2.1+GLFW3.3
+-Automated tests, run by "meson test" and by GitHub Actions on every push
+ and pull request (.github/workflows/ci.yml):
+ * test/gen_testdata.py writes a small PMX/PMD model (bones, IK, rotation and
+   translation inheritance, vertex/UV/bone/material/group morphs, rigid
+   bodies, a joint, a texture) and VMD motions (Bezier curves, morphs,
+   show/IK, camera with a cut, light, self shadow) into the build directory
+ * loader: counts and values of the PMX, PMD and VMD files, coordinate
+   conversion, VMD write/read, and broken files (missing, wrong header,
+   wrong version, huge counts, cut at every byte) must throw
+ * motion: Bezier curves, bone/morph/camera/light interpolation, seeking
+   (setTime) gives the same pose as playing, IK, inheritance and the
+   deformation order (IK under an inheriting bone of a lower level)
+ * render: pmx --snapshot draws fixed frames under Xvfb with Mesa software
+   rendering; they are compared with test/reference/*.png allowing small
+   differences ("meson compile -C build update-reference-images" makes new
+   reference images)
+-pmx: --snapshot FRAME OUT.png (play to the frame with physics, save it as a
+ PNG and exit, without window or GUI) and --size WxH
+-Fixed the pose on keyframes: bezier() returned 1 instead of 0 at the start
+ of a curve, so the first frame and seeking exactly onto a key showed the
+ pose of the next key (bones and camera). Slerp() returns the key rotations
+ exactly at 0 and 1 so that a key looks the same whether it was played or
+ sought to
+-libmmp: readPMX/readVMD throw std::runtime_error on truncated or corrupt
+ files (header, index sizes, counts larger than the file, text lengths, IK
+ bone indices) instead of reading zeroes or hanging
+-libmmp: VMDMotionController can be created with shader program 0 to
+ evaluate the animation without an OpenGL context
+
 October 11, 2026 (texture wrap):
 -Model textures repeat (Direct3D's default WRAP sampler) instead of
  clamping: models with UVs outside [0,1] (e.g. converted from VRM, such as

@@ -17,6 +17,13 @@ float bezier(float X, float x1,float y1, float x2,float y2)
 	//It's also well known that there are faster methods of solving bezier curves, such as the Newton method.
 	//However, bisection is a simpler algorithm that works well for MMD's curves, who work strictly in the range of [0,1]
 	
+	//The curve starts at (0,0) and ends at (1,1).  The bisection below cannot
+	//reach the ends (at X=0 it used to converge to t=1 and return 1, so the
+	//pose on a keyframe jumped to the next key, e.g. when seeking onto a key
+	//or at the first frame), so return them exactly.
+	if(!(X>0.0f)) return 0.0f;
+	if(X>=1.0f) return 1.0f;
+	
 	x1/=127.0f; x2/=127.0f; y1/=127.0f; y2/=127.0f;
 	
 	float x0,y0,x3,y3;
@@ -99,6 +106,11 @@ glm::fquat Lerp(const glm::quat &v0, const glm::quat &v1, float alpha)
 
 glm::fquat Slerp(glm::quat &v0, glm::quat &v1, float alpha)
 {
+	//exactly the key rotations at the ends (on a keyframe the pose must not
+	//depend on whether it was reached by playing or by seeking)
+	if(!(alpha>0.0f)) return v0;
+	if(alpha>=1.0f) return v1;
+	
 	float dot = glm::dot(v0, v1);
 	
 	if(dot<0.0f)

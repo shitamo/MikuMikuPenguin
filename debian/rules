@@ -11,6 +11,11 @@ export DEB_CXXFLAGS_MAINT_APPEND = -Wno-sign-compare -Wno-unused-variable -Wno-u
 override_dh_auto_configure:
 	dh_auto_configure -- -Dsound=enabled -Dgui=enabled
 
+# Only the unit tests: the rendering test needs X (Xvfb) and compares with
+# images made with the default build options; it runs in CI instead.
+override_dh_auto_test:
+	dh_auto_test -- --suite unit
+
 # Remove leftovers of the former autotools build system (in-tree
 # ./configure && make from older versions), which are not part of the source.
 override_dh_auto_clean:

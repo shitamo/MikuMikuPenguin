@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include <stb/stb_image.h>
+#include <stb/stb_image_write.h>
 
 #include <cstdio>
 #include <cstddef>
@@ -58,7 +59,9 @@ static void splitModelPath(const string &path, string &folder, string &file)
 	}
 }
 
-Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cameraPath, string lightPath)
+Viewer::Viewer(const vector<ModelSpec> &modelSpecs, string musicPath, string cameraPath, string lightPath,
+               const ViewerOptions &opts)
+	: options(opts)
 {
 	musicPathShown=musicPath;
 	cameraPathShown=cameraPath;
@@ -623,6 +626,43 @@ void Viewer::run()
 		
 		glfwSwapBuffers(window);
 	}
+}
+
+bool Viewer::snapshot(int frame, const string &pngPath)
+{
+	//the same fixed 1/60 s steps as run(), so the physics matches playback
+	//(without a motion only the physics runs)
+	const int steps=frame*2-sceneTime;
+	for(int i=0; i<steps; ++i) stepLogic();
+	
+	glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, framebufferWidth, framebufferHeight);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+	updateCameraUniforms();
+	render();
+	glFinish();
+	
+	const int w=framebufferWidth, h=framebufferHeight;
+	vector<unsigned char> pixels((size_t)w*h*4);
+	glReadBuffer(GL_BACK);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+	for(unsigned char *p=pixels.data()+3; p<pixels.data()+pixels.size(); p+=4) *p=255; //opaque
+	
+	//OpenGL rows start at the bottom
+	vector<unsigned char> flipped(pixels.size());
+	for(int y=0; y<h; ++y)
+	{
+		memcpy(&flipped[(size_t)y*w*4], &pixels[(size_t)(h-1-y)*w*4], (size_t)w*4);
+	}
+	if(!stbi_write_png(pngPath.c_str(), w, h, 4, flipped.data(), w*4))
+	{
+		cerr<<"ERROR: cannot write "<<pngPath<<endl;
+		return false;
+	}
+	cout<<"Wrote frame "<<frame<<" ("<<w<<"x"<<h<<") to "<<pngPath<<endl;
+	return true;
 }
 
 void Viewer::setCamera()
@@ -1274,7 +1314,8 @@ void Viewer::initGLFW()
 	glfwSetErrorCallback(glfwErrorCallback);
 	if (!glfwInit()) exit(EXIT_FAILURE);
 	
-	glfwWindowHint(GLFW_SAMPLES, 4); //4x antialiasing
+	glfwWindowHint(GLFW_SAMPLES, options.multisample ? 4 : 0); //4x antialiasing
+	glfwWindowHint(GLFW_VISIBLE, options.hidden ? GLFW_FALSE : GLFW_TRUE);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); //OpenGL 3.2 core (GLSL 1.50) is enough for the shaders
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
@@ -1283,12 +1324,12 @@ void Viewer::initGLFW()
 	glfwWindowHint(GLFW_STENCIL_BITS, 8); //ground shadow (draw each pixel once)
 	
 	//Open a window and create its OpenGL context
-	window = glfwCreateWindow(1280, 720, "PMX Viewer", NULL, NULL);
+	window = glfwCreateWindow(options.width, options.height, "PMX Viewer", NULL, NULL);
 	if(!window)
 	{
 		//Some drivers refuse a 32-bit depth buffer; retry with the default
 		glfwWindowHint(GLFW_DEPTH_BITS, 24);
-		window = glfwCreateWindow(1280, 720, "PMX Viewer", NULL, NULL);
+		window = glfwCreateWindow(options.width, options.height, "PMX Viewer", NULL, NULL);
 	}
 	if(!window)
 	{

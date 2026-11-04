@@ -57,7 +57,7 @@ PMXViewer（PMX/PMDモデル対応）には libmmp と stb_image（libstb）が�
 
     $ meson setup build
     $ meson compile -C build
-    $ meson test -C build        # 単体テスト
+    $ meson test -C build        # テスト（下記）
 
 システムにインストールする場合は：
 
@@ -65,4 +65,20 @@ PMXViewer（PMX/PMDモデル対応）には libmmp と stb_image（libstb）が�
 
 音楽再生や操作パネルを無効にするには `meson setup build -Dsound=disabled -Dgui=disabled` とします。
 Debian パッケージは `dpkg-buildpackage -us -uc -b` で作れます。
+
+## テスト
+
+`meson test -C build` で次のテストが走ります（GitHub Actions でも push とプルリクエストのたびに実行されます）。
+テスト用のモデルとモーションは `test/gen_testdata.py` がビルドディレクトリに生成します（Python 3 が必要）。
+
+* `unit` スイート: PMX / PMD / VMD の読み込み（壊れたファイルの検出を含む）、ボーン・モーフ・カメラ・照明の補間、シークと通常再生の一致、IK と付与の計算順
+* `render` スイート: `pmx --snapshot フレーム 出力.png` で決まったフレームを描き、`test/reference/` の基準画像と比べます（多少の差は許容）。
+  X が無ければ Xvfb を自動で起動し、Mesa のソフトウェア描画（`LIBGL_ALWAYS_SOFTWARE=1`）を使います。Xvfb も無ければスキップします。
+
+片方だけ実行するには `meson test -C build --suite unit` のようにします。描画を意図して変えたときは
+
+    $ meson compile -C build update-reference-images
+
+で基準画像を作り直し、`test/reference/*.png` を目で確かめてからコミットしてください。
+失敗したときの画像と差分（違う画素が赤）は `build/test/render/` に残ります。
 

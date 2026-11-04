@@ -1,3 +1,21 @@
+mikumikupenguin (0.2.1+GLFW3.3) unstable; urgency=medium
+
+  * Automated tests (meson test): a generated test model and motions
+    (test/gen_testdata.py), unit tests for the PMX/PMD/VMD loaders, bone,
+    morph, camera and light interpolation, seeking, IK and inheritance, and a
+    rendering comparison with reference images (pmx --snapshot under Xvfb).
+    GitHub Actions runs them on every push and pull request.
+  * pmx: new options --snapshot FRAME OUT.png and --size WxH.
+  * Fix the pose on a keyframe: the Bezier curve returned 1 at its start, so
+    the first frame and seeking onto a key showed the next key's pose (bones
+    and camera).
+  * libmmp: readPMX and readVMD reject truncated or corrupt files with
+    std::runtime_error instead of loading garbage.
+  * libmmp: VMDMotionController works without OpenGL (shader program 0).
+  * Build-Depends: python3 (test data generation).
+
+ -- shitamo <sitamo@gmail.com>  Wed, 04 Nov 2026 23:30:00 +0900
+
 mikumikupenguin (0.2.1+GLFW3.2) unstable; urgency=medium
 
   * Repeat model textures like MMD (fixes wrong colours of models whose

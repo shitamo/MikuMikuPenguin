@@ -1,5 +1,5 @@
 project('mikumikupenguin', 'cpp',
-  version : '0.2.1+GLFW3.2',
+  version : '0.2.1+GLFW3.3',
   license : 'GPL-3.0-only',
   meson_version : '>= 0.60.0',
   default_options : [
@@ -162,7 +162,7 @@ else
   pmx_sources += 'src/dummysound.cpp'
 endif
 
-executable('pmx', pmx_sources,
+pmx_exe = executable('pmx', pmx_sources,
   include_directories : include_directories('src'),
   cpp_args : ['-DHAVE_CONFIG_H', '-DDATA_PATH="@0@"'.format(pkgdatadir)],
   dependencies : [libmmp_dep, stb_dep, sound_deps, gui_deps],
@@ -183,9 +183,7 @@ install_data('doc/README_EN.html', 'doc/README_JP.html',
 install_man('man/pmx.1')
 
 # ---------------------------------------------------------------- tests
-glm_helper_test = executable('glm_helper_test', 'test/glm_helper_test.cpp',
-  dependencies : libmmp_dep)
-test('glm_helper', glm_helper_test)
+subdir('test')
 
 summary({
   'C++ standard' : get_option('cpp_std'),

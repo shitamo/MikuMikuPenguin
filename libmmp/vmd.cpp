@@ -17,6 +17,20 @@ using namespace std;
 namespace ClosedMMDFormat
 {
 
+	[[noreturn]] static void vmdCorrupt(const string &filename, const char *what)
+	{
+		std::ostringstream es_; es_<<"ERROR: corrupt or truncated VMD file ("<<what<<"): "<<filename; cerr<<es_.str()<<endl;
+		throw std::runtime_error(es_.str());
+	}
+
+	//A section count was read: its records must all be there (older VMD files
+	//may end before a section, which is fine, but not inside one).
+	static void vmdCheckCount(ifstream &miku, std::streamoff fileSize, unsigned count, size_t recordSize, const string &filename, const char *what)
+	{
+		std::streamoff pos=miku.tellg();
+		if(pos<0 || (std::streamoff)((unsigned long long)count*recordSize) > fileSize-pos) vmdCorrupt(filename, what);
+	}
+
 	VMDInfo &readVMD(string filename)
 	{
 		VMDInfo *vInfo = new VMDInfo();
@@ -26,11 +40,17 @@ namespace ClosedMMDFormat
 		if (!miku) { { std::ostringstream es_; es_<<"ERROR: VMD file could not be found: "<<filename; cerr<<es_.str()<<endl; throw std::runtime_error(es_.str()); } }
 		
 		//***Extract Header Info***
+		miku.seekg(0, ios::end);
+		const std::streamoff fileSize=miku.tellg();
+		miku.seekg(0, ios::beg);
+		
 		char headerStr[30] = {0};
 		miku.read((char*)&headerStr, 30);
+		if(!miku || strncmp(headerStr, "Vocaloid Motion Data", 20)!=0) vmdCorrupt(filename, "not a VMD file");
 		
 		char modelName[20];
 		miku.read((char*)&modelName, 20);
+		if(!miku) vmdCorrupt(filename, "model name");
 		vmdInfo.modelName=sjisToUTF8(modelName, sizeof(modelName));
 		
 		cout<<std::string(headerStr, strnlen(headerStr, sizeof(headerStr)))<<endl;
@@ -40,6 +60,7 @@ namespace ClosedMMDFormat
 		unsigned boneCount=0;
 		miku.read((char*)&boneCount, 4);
 		if(!miku) boneCount=0; //older/truncated VMD files may end early
+		if(boneCount>0) vmdCheckCount(miku, fileSize, boneCount, 111, filename, "boneCount");
 		if(boneCount>10000000)
 		{
 			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (boneCount="<<boneCount<<")"; cerr<<es_.str()<<endl;
@@ -128,6 +149,7 @@ namespace ClosedMMDFormat
 		unsigned morphCount=0;
 		miku.read((char*)&morphCount, 4);
 		if(!miku) morphCount=0; //older/truncated VMD files may end early
+		if(morphCount>0) vmdCheckCount(miku, fileSize, morphCount, 23, filename, "morphCount");
 		if(morphCount>10000000)
 		{
 			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (morphCount="<<morphCount<<")"; cerr<<es_.str()<<endl;
@@ -161,6 +183,7 @@ namespace ClosedMMDFormat
 		unsigned int cameraCount=0;
 		miku.read((char*)&cameraCount, 4);
 		if(!miku) cameraCount=0; //older/truncated VMD files may end early
+		if(cameraCount>0) vmdCheckCount(miku, fileSize, cameraCount, 61, filename, "cameraCount");
 		if(cameraCount>10000000)
 		{
 			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (cameraCount="<<cameraCount<<")"; cerr<<es_.str()<<endl;
@@ -204,6 +227,7 @@ namespace ClosedMMDFormat
 		unsigned lightCount=0;
 		miku.read((char*)&lightCount, 4);
 		if(!miku) lightCount=0; //older/truncated VMD files may end early
+		if(lightCount>0) vmdCheckCount(miku, fileSize, lightCount, 28, filename, "lightCount");
 		if(lightCount>10000000)
 		{
 			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (lightCount="<<lightCount<<")"; cerr<<es_.str()<<endl;
@@ -234,6 +258,7 @@ namespace ClosedMMDFormat
 		unsigned selfShadowCount=0;
 		miku.read((char*)&selfShadowCount, 4);
 		if(!miku) selfShadowCount=0; //older/truncated VMD files may end early
+		if(selfShadowCount>0) vmdCheckCount(miku, fileSize, selfShadowCount, 9, filename, "selfShadowCount");
 		if(selfShadowCount>10000000)
 		{
 			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (selfShadowCount="<<selfShadowCount<<")"; cerr<<es_.str()<<endl;
@@ -260,6 +285,7 @@ namespace ClosedMMDFormat
 		unsigned showIKCount=0;
 		miku.read((char*)&showIKCount, 4);
 		if(!miku) showIKCount=0; //older/truncated VMD files may end early
+		if(showIKCount>0) vmdCheckCount(miku, fileSize, showIKCount, 9, filename, "showIKCount");
 		if(showIKCount>10000000)
 		{
 			{ std::ostringstream es_; es_<<"ERROR: corrupt VMD file (showIKCount="<<showIKCount<<")"; cerr<<es_.str()<<endl;
@@ -292,6 +318,7 @@ namespace ClosedMMDFormat
 		}
 		cout<<"done."<<endl;
 
+		if(showIKCount>0 && !miku) vmdCorrupt(filename, "show/IK frames");
 		cout<<endl;
 		
 		return vmdInfo;

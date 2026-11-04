@@ -10,6 +10,7 @@
 #include <sstream>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 #include <stdexcept>
 #include <vector>
 
@@ -42,6 +43,10 @@ void printHelpInfo()
 	<<"  --pos X,Y,Z\tPosition (MMD coordinates) of the model given just before"<<endl
 	<<"  --loop\tRestart from the beginning at the end of the motion"<<endl
 	<<"  --no-gui\tStart with the on-screen controls hidden (Tab shows them)"<<endl
+	<<"  --size WxH\tWindow size (default 1280x720)"<<endl
+	<<"  --snapshot FRAME OUT.png"<<endl
+	<<"\t\tPlay to VMD frame FRAME (with physics), save that frame as a PNG"<<endl
+	<<"\t\tand exit, without showing the window or the controls (for tests)"<<endl
 	<<"  --help\tdisplay this help and exit"<<endl
 	<<"  --version\toutput version information and exit"<<endl<<endl
 	<<"Controls:"<<endl
@@ -78,6 +83,9 @@ int main(int argc, char** argv)
 	string light_file="";
 	bool loop=false;
 	bool gui=true;
+	ViewerOptions options;
+	int snapshotFrame=-1;
+	string snapshotPath;
 	
 	int count=0;
 	if(argc > 1)
@@ -101,6 +109,34 @@ int main(int argc, char** argv)
 			else if(string(argv[count]) == "--no-gui")
 			{
 				gui=false;
+			}
+			else if(string(argv[count]) == "--size")
+			{
+				int w=0, h=0;
+				if(count+1<argc && sscanf(argv[count+1], "%dx%d", &w, &h)==2 && w>0 && h>0)
+				{
+					++count;
+					options.width=w;
+					options.height=h;
+				}
+				else
+				{
+					cerr<<"--size needs WIDTHxHEIGHT"<<endl;
+					return 2;
+				}
+			}
+			else if(string(argv[count]) == "--snapshot")
+			{
+				char *end=NULL;
+				long f=(count+2<argc) ? strtol(argv[count+1], &end, 10) : -1;
+				if(count+2>=argc || f<0 || !end || *end!='\0')
+				{
+					cerr<<"--snapshot needs FRAME OUT.png"<<endl;
+					return 2;
+				}
+				snapshotFrame=(int)f;
+				snapshotPath=argv[count+2];
+				count+=2;
 			}
 			else if(string(argv[count]) == "--loop")
 			{
@@ -174,7 +210,14 @@ int main(int argc, char** argv)
 	
 	try
 	{
-		Viewer viewer(models,music_file,camera_file,light_file);
+		if(snapshotFrame>=0)
+		{
+			options.hidden=true;
+			options.multisample=false;
+			Viewer viewer(models,"",camera_file,light_file,options);
+			return viewer.snapshot(snapshotFrame, snapshotPath) ? 0 : 1;
+		}
+		Viewer viewer(models,music_file,camera_file,light_file,options);
 		
 		viewer.setLoop(loop);
 		viewer.setGUI(gui);

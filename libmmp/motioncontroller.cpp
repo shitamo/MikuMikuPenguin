@@ -38,6 +38,10 @@ VMDMotionController::VMDMotionController(PMXInfo &pmxInfo,VMDInfo &vmdInfo,GLuin
 	//A plain "uniform mat4 Bones[N]" array is limited by
 	//GL_MAX_VERTEX_UNIFORM_COMPONENTS (often 4096 floats = 256 matrices),
 	//and many current models have more bones than that.
+	useGL = shaderProgram!=0;
+	Bones_loc=0; boneBuffer=0; boneTexture=0; vertexBuffer=0;
+	if(useGL)
+	{
 	Bones_loc=glGetUniformLocation(shaderProgram,"boneTexture");
 	glGenBuffers(1, &boneBuffer);
 	glBindBuffer(GL_TEXTURE_BUFFER, boneBuffer);
@@ -49,6 +53,7 @@ VMDMotionController::VMDMotionController(PMXInfo &pmxInfo,VMDInfo &vmdInfo,GLuin
 	glActiveTexture(GL_TEXTURE0);
 	glBindBuffer(GL_TEXTURE_BUFFER, 0);
 	glUniform1i(Bones_loc, BONE_TEXTURE_UNIT);
+	}
 	
 	
 	boneKeyFrames.resize(pmxInfo.bone_continuing_datasets);
@@ -179,12 +184,13 @@ VMDMotionController::VMDMotionController(PMXInfo &pmxInfo,VMDInfo &vmdInfo,GLuin
 	//Remember which vertex buffer belongs to the model: the caller binds it
 	//before constructing us, but other code (e.g. the Bullet debug drawer)
 	//binds its own buffers later, so bind it explicitly when uploading.
+	if(useGL)
 	{
 		GLint bound=0;
 		glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &bound);
 		vertexBuffer=(GLuint)bound;
+		glBufferData(GL_ARRAY_BUFFER, pmxInfo.vertex_continuing_datasets*sizeof(VertexData), vertexData, GL_STREAM_DRAW);
 	}
-	glBufferData(GL_ARRAY_BUFFER, pmxInfo.vertex_continuing_datasets*sizeof(VertexData), vertexData, GL_STREAM_DRAW);
 	
 	morphKeyFrames.resize(pmxInfo.morph_continuing_datasets);
 	for(unsigned i=0; i<vmdInfo.morphFrames.size(); ++i)
@@ -212,8 +218,11 @@ VMDMotionController::~VMDMotionController()
 {
 	delete[] invBindPose;
 	delete[] skinMatrix;
-	glDeleteTextures(1, &boneTexture);
-	glDeleteBuffers(1, &boneBuffer);
+	if(useGL)
+	{
+		glDeleteTextures(1, &boneTexture);
+		glDeleteBuffers(1, &boneBuffer);
+	}
 	//free(vertexData);
 }
 
@@ -344,6 +353,7 @@ void VMDMotionController::updateVertexMorphs()
 	//***5. Material morphs***
 	updateMaterialMorphs();
 	
+	if(!useGL) return;
 	GLint previous=0;
 	glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previous);
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
@@ -441,6 +451,7 @@ void VMDMotionController::updateBoneMatrix()
 	{
 		skinMatrix[i] = pmxInfo.bones[i]->calculateGlobalMatrix() * invBindPose[i];
 	}
+	if(!useGL) return;
 	glBindBuffer(GL_TEXTURE_BUFFER, boneBuffer);
 	glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(glm::mat4)*pmxInfo.bone_continuing_datasets, skinMatrix);
 	glBindBuffer(GL_TEXTURE_BUFFER, 0);
@@ -452,6 +463,7 @@ void VMDMotionController::updateBoneMatrix()
 
 void VMDMotionController::bindBoneTexture()
 {
+	if(!useGL) return;
 	glActiveTexture(GL_TEXTURE0 + BONE_TEXTURE_UNIT);
 	glBindTexture(GL_TEXTURE_BUFFER, boneTexture);
 	glActiveTexture(GL_TEXTURE0);

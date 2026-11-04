@@ -99,8 +99,14 @@ namespace ClosedMMDFormat
 	
 	void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
 	{
-		uint32_t text_size;
+		uint32_t text_size=0;
 		miku.read((char*)&text_size, 4);
+		if(!miku) { result.clear(); return; } //the caller reports the truncated section
+		if(text_size>0x1000000) //16 MiB: certainly a corrupt file
+		{
+			std::ostringstream es_; es_<<"ERROR: corrupt PMX file (text length "<<text_size<<")"; cerr<<es_.str()<<endl;
+			throw std::runtime_error(es_.str());
+		}
 
 		if (!text_size) {	 return; }
 	     
@@ -184,6 +190,27 @@ namespace ClosedMMDFormat
 	}
 
 
+	//Broken files: throw instead of reading garbage (a truncated file used to
+	//load "successfully" with zeroed data, a huge count could hang or crash).
+	[[noreturn]] static void pmxCorrupt(const string &fname, const char *what)
+	{
+		std::ostringstream es_; es_<<"ERROR: corrupt or truncated PMX file ("<<what<<"): "<<fname; cerr<<es_.str()<<endl;
+		throw std::runtime_error(es_.str());
+	}
+
+	static void pmxCheckStream(ifstream &miku, const string &fname, const char *what)
+	{
+		if(!miku) pmxCorrupt(fname, what);
+	}
+
+	//every element of a section takes at least minBytes bytes
+	static void pmxCheckCount(ifstream &miku, std::streamoff fileSize, int count, size_t minBytes, const string &fname, const char *what)
+	{
+		if(!miku || count<0) pmxCorrupt(fname, what);
+		std::streamoff pos=miku.tellg();
+		if(pos<0 || (std::streamoff)((size_t)count*minBytes) > fileSize-pos) pmxCorrupt(fname, what);
+	}
+
 	PMXInfo &readPMX(string foldername, string filename)
 	{
 		PMXInfo *pInfo = new PMXInfo();
@@ -198,6 +225,10 @@ namespace ClosedMMDFormat
 			throw std::runtime_error(es_.str()); }
 		}
 		
+		miku.seekg(0, ios::end);
+		const std::streamoff fileSize=miku.tellg();
+		miku.seekg(0, ios::beg);
+		
 		//***Extract header info***
 		miku.read(pmxInfo.header_str, 4);
 		if(miku && memcmp(pmxInfo.header_str, "Pmd", 3)==0)
@@ -207,6 +238,7 @@ namespace ClosedMMDFormat
 			delete pInfo;
 			return readPMD(foldername, filename);
 		}
+		if(!miku || memcmp(pmxInfo.header_str, "PMX ", 4)!=0) pmxCorrupt(fname, "not a PMX file");
 		miku.read((char*)&pmxInfo.ver, 4);
 		
 		/*if(string(pmxInfo.header_str).find("PMX ")==-1)
@@ -230,6 +262,12 @@ namespace ClosedMMDFormat
 		miku.read((char*)&pmxInfo.boneIndexSize,      1);
 		miku.read((char*)&pmxInfo.morphIndexSize,     1);
 		miku.read((char*)&pmxInfo.rigidBodyIndexSize, 1);
+		pmxCheckStream(miku, fname, "header");
+		for(uint8_t sz : {pmxInfo.vertexIndexSize, pmxInfo.textureIndexSize, pmxInfo.materialIndexSize,
+		                  pmxInfo.boneIndexSize, pmxInfo.morphIndexSize, pmxInfo.rigidBodyIndexSize})
+		{
+			if(sz!=1 && sz!=2 && sz!=4) pmxCorrupt(fname, "index size");
+		}
 		
 
 		if (pmxInfo.unicode_type == PMX_ENCODE_UTF8) {
@@ -244,6 +282,7 @@ namespace ClosedMMDFormat
 		
 		//***Pull Vertex Info***
 		miku.read((char*)&pmxInfo.vertex_continuing_datasets, 4);
+		pmxCheckCount(miku, fileSize, pmxInfo.vertex_continuing_datasets, 37, fname, "vertex count");
 		
 		//exit(EXIT_SUCCESS);
 		cout<<"Loading vertices...";
@@ -337,7 +376,9 @@ namespace ClosedMMDFormat
 		cout<<"done."<<endl;
 		
 		//***Pull Face Info***
+		pmxCheckStream(miku, fname, "vertices");
 		miku.read((char*)&pmxInfo.face_continuing_datasets, 4);
+		pmxCheckCount(miku, fileSize, pmxInfo.face_continuing_datasets, pmxInfo.vertexIndexSize, fname, "face count");
 		
 		cout<<"Loading faces...";
 		for(int i = 0; i < pmxInfo.face_continuing_datasets / 3; i++)
@@ -352,6 +393,7 @@ namespace ClosedMMDFormat
 		}
 		cout<<"done."<<endl;
 		
+		pmxCheckStream(miku, fname, "faces");
 		//***Pull Texture Info***	
 		miku.read((char*)&pmxInfo.texture_continuing_datasets, 4);
 		if(!miku || pmxInfo.texture_continuing_datasets<0 || pmxInfo.texture_continuing_datasets>1000000)
@@ -383,7 +425,9 @@ namespace ClosedMMDFormat
 		cout<<"done."<<endl;
 		
 		//***Pull Material Info***
+		pmxCheckStream(miku, fname, "textures");
 		miku.read((char*)&pmxInfo.material_continuing_datasets, 4);
+		pmxCheckCount(miku, fileSize, pmxInfo.material_continuing_datasets, 50, fname, "material count");
 		
 		cout<<"Loading materials...";
 		for(int i = 0; i < pmxInfo.material_continuing_datasets; ++i)
@@ -485,7 +529,9 @@ namespace ClosedMMDFormat
 		cout<<"done."<<endl;
 		
 		//***Pull Bone Info***
+		pmxCheckStream(miku, fname, "materials");
 		miku.read((char*)&pmxInfo.bone_continuing_datasets, 4);
+		pmxCheckCount(miku, fileSize, pmxInfo.bone_continuing_datasets, 20, fname, "bone count");
 		
 		cout<<"Loading bones...";
 		for(int i = 0; i < pmxInfo.bone_continuing_datasets; ++i)
@@ -582,6 +628,7 @@ namespace ClosedMMDFormat
 				miku.read((char*)&bone->IKLoopCount,      4);
 				miku.read((char*)&bone->IKLoopAngleLimit, 4);
 				miku.read((char*)&bone->IKLinkNum,        4);
+				pmxCheckCount(miku, fileSize, (int)bone->IKLinkNum, 2, fname, "IK link count");
 				
 				for(int j = 0; j < bone->IKLinkNum; ++j)
 				{
@@ -614,11 +661,24 @@ namespace ClosedMMDFormat
 			pmxInfo.bones.push_back(bone);
 		}
 
+		pmxCheckStream(miku, fname, "bones");
+		for(PMXBone *bone : pmxInfo.bones)
+		{
+			if(bone->IK)
+			{
+				if(bone->IKTargetBoneIndex<0 || bone->IKTargetBoneIndex>=pmxInfo.bone_continuing_datasets) pmxCorrupt(fname, "IK target bone");
+				for(PMXIKLink *link : bone->IKLinks)
+				{
+					if(link->linkBoneIndex<0 || link->linkBoneIndex>=pmxInfo.bone_continuing_datasets) pmxCorrupt(fname, "IK link bone");
+				}
+			}
+		}
 		finalizePMXBones(pmxInfo);
 		cout<<"done."<<endl;
 			
 		//***Pull Morph Info***
 		miku.read((char*)&pmxInfo.morph_continuing_datasets, 4);
+		pmxCheckCount(miku, fileSize, pmxInfo.morph_continuing_datasets, 14, fname, "morph count");
 		//cout<<"Morph Continuing Datasets: "<<pmxInfo.morph_continuing_datasets<<endl;
 		
 		cout<<"Loading morphs...";
@@ -635,6 +695,7 @@ namespace ClosedMMDFormat
 			miku.read((char*)&morph->controlPanel, 1);
 			miku.read((char*)&morph->type, 1);
 			miku.read((char*)&morph->morphOffsetNum, 4);
+			pmxCheckCount(miku, fileSize, morph->morphOffsetNum, 5, fname, "morph offset count");
 			
 			//cout<<"Control Panel: "<<(int)morph->controlPanel<<endl;
 			//cout<<"Type: "<<(int)morph->type<<endl;
@@ -788,7 +849,9 @@ namespace ClosedMMDFormat
 		cout<<"done"<<endl;
 		
 		//***Pull Display Frame Info***
+		pmxCheckStream(miku, fname, "morphs");
 		miku.read((char*)&pmxInfo.display_frame_continuing_datasets, 4);
+		pmxCheckCount(miku, fileSize, pmxInfo.display_frame_continuing_datasets, 13, fname, "display frame count");
 		//cout<<"Display Frame Continuing Datasets: "<<pmxInfo.display_frame_continuing_datasets<<endl;
 		
 		cout<<"Loading display frame...";
@@ -804,6 +867,7 @@ namespace ClosedMMDFormat
 			miku.read((char*)&df->specialFrameFlag, 1); // bool PMXDisplayFrame->specialFrameFlag
 			
 			miku.read((char*)&df->elementsWithinFrame, 4);
+			pmxCheckCount(miku, fileSize, df->elementsWithinFrame, 2, fname, "display frame element count");
 			
 			for(int i = 0; i < df->elementsWithinFrame; ++i)
 			{
@@ -827,7 +891,9 @@ namespace ClosedMMDFormat
 		cout<<"done"<<endl;
 		
 		//***Pull Rigid Body Info***
+		pmxCheckStream(miku, fname, "display frames");
 		miku.read((char*)&pmxInfo.rigid_body_continuing_datasets, 4);
+		pmxCheckCount(miku, fileSize, pmxInfo.rigid_body_continuing_datasets, 70, fname, "rigid body count");
 		//cout<<"Rigid Body Continuing Datasets: "<<pmxInfo.rigid_body_continuing_datasets<<endl;
 		
 		cout<<"Loading rigid body...";
@@ -875,7 +941,9 @@ namespace ClosedMMDFormat
 		cout<<"done"<<endl;
 		
 		//***Pull Rigid Body Info***
+		pmxCheckStream(miku, fname, "rigid bodies");
 		miku.read((char*)&pmxInfo.joint_continuing_datasets, 4);
+		pmxCheckCount(miku, fileSize, pmxInfo.joint_continuing_datasets, 105, fname, "joint count");
 		//cout<<"Joint Continuing Datasets: "<<pmxInfo.joint_continuing_datasets<<endl;
 		for(int i = 0; i < pmxInfo.joint_continuing_datasets; ++i)
 		{
@@ -933,6 +1001,7 @@ namespace ClosedMMDFormat
 			
 			pmxInfo.joints.push_back(joint);
 		}
+		pmxCheckStream(miku, fname, "joints");
 		cout<<"Loading joints...";
 		
 		cout<<"done"<<endl<<endl;
