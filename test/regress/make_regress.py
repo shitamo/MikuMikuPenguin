@@ -174,8 +174,8 @@ CASES = {
     'pmx_faces_no_vertices.pmx': pmx(faces=(3, u8(0, 1, 2)), materials=(1, material(faces=3))),
     'pmd_faces_no_vertices.pmd': b'',  # filled in below
     # Material face counts larger than the index buffer (glDrawElements
-    # outside the buffer), negative or not a multiple of 3; texture and
-    # toon indices outside the texture list.
+    # outside the buffer) or negative; texture and toon indices outside the
+    # texture list.
     'pmx_material_ranges.pmx': pmx(vertices=TRIANGLE, faces=(3, u8(0, 1, 2)), textures=(1, text('a.png')),
                                    materials=(3, material((5, -1), (0, 9), 300) + material((-7, 0), (1, 200), -3)
                                               + material(faces=2))),

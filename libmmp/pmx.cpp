@@ -268,7 +268,7 @@ namespace ClosedMMDFormat
 		{
 			for(int *b : {&v->boneIndex1, &v->boneIndex2, &v->boneIndex3, &v->boneIndex4})
 			{
-				if(!validBone(*b)) { note(*b!=-1); *b=0; }
+				if(!validBone(*b)) { note(*b!=-1 && *b!=0); *b=0; } //0: unused slot of a model without bones
 			}
 			if(v->weight_transform_formula>WEIGHT_FORMULA_SDEF) { note(true); v->weight_transform_formula=WEIGHT_FORMULA_BDEF1; }
 		}
@@ -285,7 +285,8 @@ namespace ClosedMMDFormat
 		}
 
 		//materials: texture indices and face ranges (the draw calls must stay
-		//inside the index buffer)
+		//inside the index buffer; a count that is not a multiple of 3 is kept,
+		//as the later materials start after it and GL ignores the remainder)
 		long long indicesLeft=(long long)m.faces.size()*3;
 		for(PMXMaterial *mat : m.materials)
 		{
@@ -297,12 +298,10 @@ namespace ClosedMMDFormat
 			if(mat->shareToon==1 && mat->shareToonTexture>9) { note(true); mat->shareToonTexture=0; }
 			if(mat->sphereMode>3) { note(true); mat->sphereMode=0; }
 			long long n=mat->hasFaceNum;
-			if(n<0 || n%3!=0 || n>indicesLeft)
+			if(n<0 || n>indicesLeft)
 			{
 				note(true);
-				if(n<0) n=0;
-				n-=n%3;
-				if(n>indicesLeft) n=indicesLeft;
+				n=(n<0) ? 0 : indicesLeft;
 				mat->hasFaceNum=(int)n;
 			}
 			indicesLeft-=n;

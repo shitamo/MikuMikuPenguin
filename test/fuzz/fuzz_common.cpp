@@ -346,7 +346,7 @@ namespace mmpfuzz
 		for(const PMXMaterial *mat : m.materials)
 		{
 			for(int t : {mat->textureIndex, mat->sphereIndex, mat->toonTextureIndex}) check(t>=-1 && t<nt, "material texture");
-			check(mat->hasFaceNum>=0 && mat->hasFaceNum%3==0, "material face count");
+			check(mat->hasFaceNum>=0, "material face count");
 			check(mat->shareToon<=1 && (mat->shareToon==0 || mat->shareToonTexture<=9), "material toon");
 			indices+=mat->hasFaceNum;
 		}
